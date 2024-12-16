@@ -1,4 +1,4 @@
-module nst.go
+module github.com/aricart/nst.go
 
 go 1.22
 
