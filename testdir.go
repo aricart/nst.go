@@ -20,6 +20,10 @@ func NewTestDir(t *testing.T, dir string, pattern string) *TestDir {
 	return &TestDir{t: t, Dir: dirPath}
 }
 
+func (td *TestDir) String() string {
+	return td.Dir
+}
+
 func (td *TestDir) Cleanup() {
 	if td.t.Failed() {
 		td.t.Logf("test Dir location: %v", td)
