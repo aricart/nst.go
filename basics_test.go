@@ -103,7 +103,7 @@ func (s *BasicTestSuite) TestServerConfigJetStream() {
 	td := NewTestDir(s.T(), "", "nst-test")
 	defer td.Cleanup()
 
-	opts := DefaultNatsServerWithJetStreamOptions(td.dir)
+	opts := DefaultNatsServerWithJetStreamOptions(td.Dir)
 	opts.Debug = true
 	opts.Trace = true
 
@@ -127,7 +127,7 @@ func (s *BasicTestSuite) TestOperator() {
 	td := NewTestDir(t, "", "nst-test")
 	defer td.Cleanup()
 
-	auth, err := authb.NewAuth(nsc.NewNscProvider(fmt.Sprintf("%s/nsc/stores", td.dir), fmt.Sprintf("%s/nsc/keys", td.dir)))
+	auth, err := authb.NewAuth(nsc.NewNscProvider(fmt.Sprintf("%s/nsc/stores", td.Dir), fmt.Sprintf("%s/nsc/keys", td.Dir)))
 	s.NoError(err)
 
 	o, err := auth.Operators().Add("O")
