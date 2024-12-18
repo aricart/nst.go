@@ -32,6 +32,8 @@ func ResolverFromAuth(t *testing.T, operator authb.Operator) *ResolverConf {
 
 // Conf rudimentary struct representing a configuration, missing most :)
 type Conf struct {
+	Accounts      Accounts      `json:"accounts,omitempty"`
+	SystemAccount *string       `json:"system_account,omitempty"`
 	Authorization Authorization `json:"authorization,omitempty"`
 }
 
@@ -49,7 +51,22 @@ func (c Conf) Marshal(t *testing.T) []byte {
 
 // Authorization block
 type Authorization struct {
-	Users Users `json:"users,omitempty"`
+	Users       Users        `json:"users,omitempty"`
+	AuthCallout *AuthCallout `json:"auth_callout,omitempty"`
+}
+
+type AuthCallout struct {
+	// AuthUsers is a list of authorized users under Account that will handle callout requests
+	AuthUsers jwt.StringList `json:"auth_users"`
+	// Account containing the AuthUsers
+	Account string `json:"account,omitempty"`
+	// Issuer the public key that will issue jwt.AuthorizationResponseClaims
+	Issuer string `json:"issuer"`
+	// XKey optional public curve key, activates encryption
+	XKey string `json:"xkey,omitempty"`
+	// AllowedAccounts optional public list of accounts that users can be placed in
+	// this option is not yet available
+	// AllowedAccounts jwt.StringList `json:"allowed_accounts,omitempty"`
 }
 
 // Users block
@@ -61,18 +78,24 @@ func (u *Users) Add(user ...User) {
 	}
 }
 
+type Accounts map[string]Account
+
+type Account struct {
+	Users Users `json:"users,omitempty"`
+}
+
 // User represents Username/Password/Token/Permissions
 type User struct {
-	User        string      `json:"user,omitempty"`
-	Password    string      `json:"password,omitempty"`
-	Token       string      `json:"token,omitempty"`
-	Permissions Permissions `json:"permissions,omitempty"`
+	User        string       `json:"user,omitempty"`
+	Password    string       `json:"password,omitempty"`
+	Token       string       `json:"token,omitempty"`
+	Permissions *Permissions `json:"permissions,omitempty"`
 }
 
 // Permissions block
 type Permissions struct {
-	Publish        AllowDeny `json:"publish,omitempty"`
-	Subscribe      AllowDeny `json:"subscribe,omitempty"`
+	Pub            AllowDeny `json:"publish,omitempty"`
+	Sub            AllowDeny `json:"subscribe,omitempty"`
 	AllowResponses bool      `json:"allow_responses,omitempty"`
 }
 

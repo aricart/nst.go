@@ -2,9 +2,12 @@ package nst
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/nats-io/nkeys"
 
 	authb "github.com/synadia-io/jwt-auth-builder.go"
 	"github.com/synadia-io/jwt-auth-builder.go/providers/nsc"
@@ -61,18 +64,13 @@ func (s *BasicTestSuite) TestServerConfig() {
 	td := NewTestDir(s.T(), "", "nst-test")
 	defer td.Cleanup()
 
-	u := User{User: "a", Password: "b"}
-	u.Permissions.Publish.Allow.Add("echo")
-	u.Permissions.Subscribe.Allow.Add("_INBOX.>")
-
-	a := User{User: "svc", Password: "s"}
-	a.Permissions.Subscribe.Allow.Add("echo")
-	a.Permissions.Publish.Deny.Add(">")
-	a.Permissions.AllowResponses = true
+	u := User{User: "a", Password: "b", Permissions: &Permissions{}}
+	u.Permissions.Pub.Allow.Add("echo")
+	u.Permissions.Pub.Allow.Add(UserInfoSubj)
+	u.Permissions.Sub.Allow.Add("_INBOX.>")
 
 	conf := Conf{}
 	conf.Authorization.Users.Add(u)
-	conf.Authorization.Users.Add(a)
 
 	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
 
@@ -84,19 +82,75 @@ func (s *BasicTestSuite) TestServerConfig() {
 	})
 	defer ns.Shutdown()
 
-	svc := ns.ConnectWithOptions(nats.Options{User: "svc", Password: "s"})
-	_, err := svc.Subscribe("echo", func(m *nats.Msg) {
-		_ = m.Respond(m.Data)
-	})
-	s.NoError(err)
-	defer svc.Close()
-
 	nc := ns.ConnectWithOptions(nats.Options{User: "a", Password: "b"})
 	defer nc.Close()
 
-	r, err := nc.Request("echo", []byte("hello"), 2*time.Second)
+	info := ClientInfo(s.T(), nc)
+	s.Len(info.Data.Permissions.Pub.Allow, 2)
+	s.Contains(info.Data.Permissions.Pub.Allow, "echo")
+	s.Contains(info.Data.Permissions.Pub.Allow, UserInfoSubj)
+	s.Len(info.Data.Permissions.Sub.Allow, 1)
+	s.Contains(info.Data.Permissions.Sub.Allow, "_INBOX.>")
+	s.False(info.Data.Permissions.AllowResponses)
+}
+
+func (s *BasicTestSuite) TestServerConfigAccounts() {
+	td := NewTestDir(s.T(), "", "nst-test")
+	defer td.Cleanup()
+
+	conf := Conf{Accounts: make(map[string]Account)}
+	conf.Accounts["B"] = Account{}
+	conf.Authorization.Users.Add(User{User: "auth", Password: "pwd"})
+	akp, err := nkeys.CreateAccount()
 	s.NoError(err)
-	s.Equal(r.Data, []byte("hello"))
+	pub, err := akp.PublicKey()
+	s.NoError(err)
+	conf.Authorization.AuthCallout = &AuthCallout{}
+	conf.Authorization.AuthCallout.Issuer = pub
+	conf.Authorization.AuthCallout.AuthUsers.Add("auth")
+
+	// s.T().Log(string(conf.Marshal(s.T())))
+
+	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
+
+	ns := NewNatsServer(s.T(), &natsserver.Options{
+		ConfigFile: fn,
+		Debug:      true,
+		Trace:      true,
+		NoLog:      false,
+	})
+	defer ns.Shutdown()
+
+	nc := ns.ConnectWithOptions(nats.Options{User: "auth", Password: "pwd"})
+	r, err := nc.Request("$SYS.REQ.USER.INFO", []byte{}, time.Second*2)
+	s.NoError(err)
+	var info UserInfo
+	s.NoError(json.Unmarshal(r.Data, &info))
+	fmt.Printf("%+v\n", info)
+}
+
+func (s *BasicTestSuite) TestSys() {
+	td := NewTestDir(s.T(), "", "nst-test")
+	defer td.Cleanup()
+
+	conf := Conf{Accounts: make(map[string]Account)}
+	sys := "SYS"
+	conf.SystemAccount = &sys
+	conf.Accounts[sys] = Account{}
+
+	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
+
+	ns := NewNatsServer(s.T(), &natsserver.Options{
+		ConfigFile: fn,
+		Debug:      true,
+		Trace:      true,
+		NoLog:      false,
+	})
+	defer ns.Shutdown()
+
+	sa := ns.Server.SystemAccount()
+	s.NotNil(sa)
+	s.Equal("SYS", sa.Name)
 }
 
 func (s *BasicTestSuite) TestServerConfigJetStream() {
