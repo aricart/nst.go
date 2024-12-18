@@ -1,6 +1,7 @@
 package nst
 
 import (
+	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/require"
 )
+
+const UserInfoSubj = "$SYS.REQ.USER.INFO"
 
 // NatsServer represents a nats-server
 type NatsServer struct {
@@ -152,6 +155,15 @@ func (ts *NatsServer) Shutdown() {
 	ts.Server.Shutdown()
 }
 
+func ClientInfo(t *testing.T, nc *nats.Conn) UserInfo {
+	r, err := nc.Request(UserInfoSubj, nil, time.Second*2)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	var info UserInfo
+	require.NoError(t, json.Unmarshal(r.Data, &info))
+	return info
+}
+
 //func (ts *NatsServer) NewKv(bucket string) jetstream.KeyValue {
 //	nc := ts.Connect()
 //	js, err := jetstream.New(nc)
@@ -164,22 +176,34 @@ func (ts *NatsServer) Shutdown() {
 //	return kv
 //}
 
-//type ErrorDetails struct {
-//	Account     string `json:"account"`
-//	Code        int    `json:"code"`
-//	Description string `json:"description"`
-//}
-//
-//type ServerDetails struct {
-//	Name      string    `json:"name"`
-//	Host      string    `json:"host"`
-//	ID        string    `json:"id"`
-//	Version   string    `json:"ver"`
-//	Jetstream bool      `json:"jetstream"`
-//	Flags     int       `json:"flags"`
-//	Sequence  int       `json:"seq"`
-//	Time      time.Time `json:"time"`
-//}
+//	type ErrorDetails struct {
+//		Account     string `json:"account"`
+//		Code        int    `json:"code"`
+//		Description string `json:"description"`
+//	}
+type ServerDetails struct {
+	Name      string    `json:"name"`
+	Host      string    `json:"host"`
+	ID        string    `json:"id"`
+	Version   string    `json:"ver"`
+	Jetstream bool      `json:"jetstream"`
+	Flags     int       `json:"flags"`
+	Sequence  int       `json:"seq"`
+	Time      time.Time `json:"time"`
+}
+
+type UserData struct {
+	User        string      `json:"user"`
+	Account     string      `json:"account"`
+	Permissions Permissions `json:"permissions"`
+	Expires     int64       `json:"expires"`
+}
+
+type UserInfo struct {
+	ServerDetails
+	Data UserData `json:"data"`
+}
+
 //
 //type PushResponse struct {
 //	Error  *ErrorDetails `json:"error,omitempty"`

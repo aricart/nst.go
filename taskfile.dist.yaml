@@ -5,17 +5,16 @@ version: '3'
 
 tasks:
   cover:
+    deps: [test]
     cmds:
       - go tool cover -html=coverage.out
   test:
-    deps:
     cmds:
       - rm -f ./coverage.out
       - go test -coverpkg=./... -coverprofile=./coverage.out ./...
-      - go tool cover -html=./coverage.out
   lint:
     cmds:
-      - golangci-lint run
+      - go vet ./...
   fmt:
     cmds:
       - gofumpt -l -w .
