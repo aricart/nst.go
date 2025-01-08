@@ -9,7 +9,7 @@ type NilLogger struct {
 	logger server.Logger
 }
 
-func NewTestLogger() server.Logger {
+func NewNilLogger() server.Logger {
 	logger := nslogger.NewStdLogger(true, true, true, true, true)
 	return &NilLogger{
 		logger: logger,
