@@ -10,11 +10,11 @@ import (
 
 // TestDir a directory  with some simple powers
 type TestDir struct {
-	t   *testing.T
+	t   testing.TB
 	Dir string
 }
 
-func NewTestDir(t *testing.T, dir string, pattern string) *TestDir {
+func NewTestDir(t testing.TB, dir string, pattern string) *TestDir {
 	dirPath, err := os.MkdirTemp(dir, pattern)
 	require.NoError(t, err)
 	return &TestDir{t: t, Dir: dirPath}
