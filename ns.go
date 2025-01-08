@@ -18,7 +18,7 @@ const UserInfoSubj = "$SYS.REQ.USER.INFO"
 // NatsServer represents a nats-server
 type NatsServer struct {
 	sync.Mutex
-	t      *testing.T
+	t      testing.TB
 	Server *server.Server
 	// Resolver *ResolverConf
 	Url   string
@@ -51,7 +51,7 @@ type NatsServer struct {
 //	}
 //}
 
-func NewNatsServer(t *testing.T, opts *server.Options) *NatsServer {
+func NewNatsServer(t testing.TB, opts *server.Options) *NatsServer {
 	ns, u := StartNatsServer(t, opts)
 	return &NatsServer{
 		t:      t,
@@ -60,7 +60,7 @@ func NewNatsServer(t *testing.T, opts *server.Options) *NatsServer {
 	}
 }
 
-func StartNatsServer(t *testing.T, opts *server.Options) (*server.Server, string) {
+func StartNatsServer(t testing.TB, opts *server.Options) (*server.Server, string) {
 	defaults := DefaultNatsServerOptions()
 	if opts == nil {
 		opts = DefaultNatsServerOptions()
@@ -155,7 +155,7 @@ func (ts *NatsServer) Shutdown() {
 	ts.Server.Shutdown()
 }
 
-func ClientInfo(t *testing.T, nc *nats.Conn) UserInfo {
+func ClientInfo(t testing.TB, nc *nats.Conn) UserInfo {
 	r, err := nc.Request(UserInfoSubj, nil, time.Second*2)
 	require.NoError(t, err)
 	require.NotNil(t, r)

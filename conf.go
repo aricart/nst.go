@@ -11,7 +11,7 @@ import (
 	"github.com/synadia-io/jwt-auth-builder.go"
 )
 
-func ResolverFromAuth(t *testing.T, operator authb.Operator) *ResolverConf {
+func ResolverFromAuth(t testing.TB, operator authb.Operator) *ResolverConf {
 	var config ResolverConf
 	config.Resolver.Type = "mem"
 
@@ -40,7 +40,7 @@ type Conf struct {
 // Marshal serializes a Conf into JSON. This is necessary because
 // some permissions setups will have subject wildcards which will
 // serialize incorrectly as JSON.
-func (c Conf) Marshal(t *testing.T) []byte {
+func (c Conf) Marshal(t testing.TB) []byte {
 	buffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(buffer)
 	encoder.SetEscapeHTML(false)
