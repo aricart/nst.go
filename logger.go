@@ -21,9 +21,6 @@ func (l *NilLogger) Warnf(format string, v ...interface{})   {}
 func (l *NilLogger) Fatalf(format string, v ...interface{}) {
 	l.logger.Fatalf(format, v...)
 }
-
-func (l *NilLogger) Errorf(format string, v ...interface{}) {
-	l.logger.Errorf(format, v...)
-}
+func (l *NilLogger) Errorf(format string, v ...interface{}) {}
 func (l *NilLogger) Debugf(format string, v ...interface{}) {}
 func (l *NilLogger) Tracef(format string, v ...interface{}) {}
