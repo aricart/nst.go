@@ -32,9 +32,29 @@ func ResolverFromAuth(t testing.TB, operator authb.Operator) *ResolverConf {
 
 // Conf rudimentary struct representing a configuration, missing most :)
 type Conf struct {
+	Include       string        `json:"include,omitempty"`
 	Accounts      Accounts      `json:"accounts,omitempty"`
 	SystemAccount *string       `json:"system_account,omitempty"`
 	Authorization Authorization `json:"authorization,omitempty"`
+	JetStream     *JetStream    `json:"jetstream,omitempty"`
+	LeafNodes     *LeafNodes    `json:"leafnodes,omitempty"`
+}
+
+type JetStream struct {
+	StoreDir string `json:"store_dir,omitempty"`
+	Domain   string `json:"domain,omitempty"`
+	MaxMem   uint64 `json:"max_mem,omitempty"`
+	MaxFile  uint64 `json:"max_file,omitempty"`
+}
+
+type LeafNodes struct {
+	Port    int16    `json:"port,omitempty"`
+	Remotes []Remote `json:"remotes,omitempty"`
+}
+
+type Remote struct {
+	Urls        []string `json:"urls,omitempty"`
+	Credentials string   `json:"credentials,omitempty"`
 }
 
 // Marshal serializes a Conf into JSON. This is necessary because

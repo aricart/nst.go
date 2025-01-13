@@ -94,6 +94,55 @@ func (s *BasicTestSuite) TestServerConfig() {
 	s.False(info.Data.Permissions.AllowResponses)
 }
 
+func (s *BasicTestSuite) TestServerJetStreamServerConfig() {
+	td := NewTestDir(s.T(), "", "nst-test")
+	defer td.Cleanup()
+
+	conf := Conf{}
+	conf.JetStream = &JetStream{
+		StoreDir: fmt.Sprintf("%s/js", td.Dir),
+	}
+	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
+
+	ns := NewNatsServer(s.T(), &natsserver.Options{ConfigFile: fn})
+	defer ns.Shutdown()
+
+	s.True(ns.Server.JetStreamEnabled())
+}
+
+func (s *BasicTestSuite) TestServerLeafNodeConfig() {
+	td := NewTestDir(s.T(), "", "nst-test")
+	defer td.Cleanup()
+
+	conf := Conf{}
+	conf.LeafNodes = &LeafNodes{
+		Port: 7422,
+	}
+	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
+	ns := NewNatsServer(s.T(), &natsserver.Options{ConfigFile: fn})
+	defer ns.Shutdown()
+
+	nc := ns.Connect()
+	nc.Subscribe("q", func(m *nats.Msg) {
+		_ = m.Respond(m.Data)
+	})
+
+	ln := Conf{}
+	ln.LeafNodes = &LeafNodes{}
+
+	ln.LeafNodes.Remotes = append(ln.LeafNodes.Remotes,
+		Remote{Urls: []string{"nats://127.0.0.1:7422"}})
+
+	fn = td.WriteFile("leafnode.conf", ln.Marshal(s.T()))
+	leaf := NewNatsServer(s.T(), &natsserver.Options{ConfigFile: fn})
+	defer leaf.Shutdown()
+
+	lc := leaf.Connect()
+	r, err := lc.Request("q", []byte("hello"), 2*time.Second)
+	s.NoError(err)
+	s.Equal(r.Data, []byte("hello"))
+}
+
 func (s *BasicTestSuite) TestServerConfigAccounts() {
 	td := NewTestDir(s.T(), "", "nst-test")
 	defer td.Cleanup()

@@ -66,7 +66,7 @@ func StartNatsServer(t testing.TB, opts *server.Options) (*server.Server, string
 		opts = DefaultNatsServerOptions()
 	}
 
-	err := mergo.Merge(defaults, opts)
+	err := mergo.Merge(opts, defaults)
 	require.NoError(t, err)
 
 	if opts.ConfigFile != "" {
