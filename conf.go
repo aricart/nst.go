@@ -38,6 +38,7 @@ type Conf struct {
 	Authorization Authorization `json:"authorization,omitempty"`
 	JetStream     *JetStream    `json:"jetstream,omitempty"`
 	LeafNodes     *LeafNodes    `json:"leafnodes,omitempty"`
+	WriteDeadline string        `json:"write_deadline,omitempty"`
 }
 
 type JetStream struct {

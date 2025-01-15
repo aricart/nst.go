@@ -81,7 +81,7 @@ func StartNatsServer(t testing.TB, opts *server.Options) (*server.Server, string
 		t.Fatal("Unable to start NATS Server in Go Routine")
 	}
 
-	ports := s.PortsInfo(time.Second)
+	ports := s.PortsInfo(10 * time.Second)
 
 	return s, ports.Nats[0]
 }
@@ -108,17 +108,19 @@ func DefaultNatsServerOptions() *server.Options {
 	}
 }
 
-// Connect returns a connection, the server must not have auth enabled
-func (ts *NatsServer) Connect() *nats.Conn {
-	nc, err := ts.MaybeConnect(nil)
-	require.NoError(ts.t, err)
-	return nc
+func (ts *NatsServer) TrackConn(conn ...*nats.Conn) {
+	ts.Lock()
+	defer ts.Unlock()
+	ts.Conns = append(ts.Conns, conn...)
 }
 
-//func (ts *NatsServer) ConnectAccount(account string, user string, bearer bool) (*nats.Conn, error) {
-//	u := ts.Resolver.Identities.CreateUser(account, user, bearer)
-//	return ts.MaybeConnect(u.ConnectOptions())
-//}
+// RequireConnect returns a connection, the server must not have auth enabled
+func (ts *NatsServer) RequireConnect(opts ...nats.Option) *nats.Conn {
+	nc, err := ts.UntrackedConnection(opts...)
+	require.NoError(ts.t, err)
+	ts.TrackConn(nc)
+	return nc
+}
 
 // MaybeConnect this connection could fail and tests want to verify it
 func (ts *NatsServer) MaybeConnect(options ...nats.Option) (*nats.Conn, error) {
@@ -131,18 +133,14 @@ func (ts *NatsServer) MaybeConnect(options ...nats.Option) (*nats.Conn, error) {
 	return nc, err
 }
 
-// ConnectWithOptions expect this connection to work
-func (ts *NatsServer) ConnectWithOptions(options nats.Options) *nats.Conn {
-	ts.Lock()
-	defer ts.Unlock()
-	options.Url = ts.Url
-	nc, err := options.Connect()
-	require.NoError(ts.t, err)
-	if err == nil {
-		ts.Conns = append(ts.Conns, nc)
-	}
-	return nc
+func (ts *NatsServer) UntrackedConnection(opts ...nats.Option) (*nats.Conn, error) {
+	return nats.Connect(ts.Url, opts...)
 }
+
+//func (ts *NatsServer) ConnectAccount(account string, user string, bearer bool) (*nats.Conn, error) {
+//	u := ts.Resolver.Identities.CreateUser(account, user, bearer)
+//	return ts.MaybeConnect(u.ConnectOptions())
+//}
 
 // Shutdown Stops closes all current connections initiated via this API and shutsdown
 // the server
@@ -165,7 +163,7 @@ func ClientInfo(t testing.TB, nc *nats.Conn) UserInfo {
 }
 
 //func (ts *NatsServer) NewKv(bucket string) jetstream.KeyValue {
-//	nc := ts.Connect()
+//	nc := ts.RequireConnect()
 //	js, err := jetstream.New(nc)
 //	require.NoError(ts.t, err)
 //

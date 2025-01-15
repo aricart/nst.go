@@ -41,7 +41,7 @@ func (s *BasicTestSuite) TestSimpleServer() {
 	ns := NewNatsServer(s.T(), nil)
 	defer ns.Shutdown()
 
-	nc := ns.Connect()
+	nc := ns.RequireConnect()
 	defer nc.Close()
 	_, err := nc.Subscribe("echo", func(m *nats.Msg) {
 		_ = m.Respond(m.Data)
@@ -55,7 +55,7 @@ func (s *BasicTestSuite) TestSimpleServer() {
 
 func (s *BasicTestSuite) TestShutdownClosesClients() {
 	ns := NewNatsServer(s.T(), nil)
-	nc := ns.Connect()
+	nc := ns.RequireConnect()
 	ns.Shutdown()
 	s.True(nc.IsClosed())
 }
@@ -82,7 +82,7 @@ func (s *BasicTestSuite) TestServerConfig() {
 	})
 	defer ns.Shutdown()
 
-	nc := ns.ConnectWithOptions(nats.Options{User: "a", Password: "b"})
+	nc := ns.RequireConnect(nats.UserInfo("a", "b"))
 	defer nc.Close()
 
 	info := ClientInfo(s.T(), nc)
@@ -122,7 +122,7 @@ func (s *BasicTestSuite) TestServerLeafNodeConfig() {
 	ns := NewNatsServer(s.T(), &natsserver.Options{ConfigFile: fn})
 	defer ns.Shutdown()
 
-	nc := ns.Connect()
+	nc := ns.RequireConnect()
 	nc.Subscribe("q", func(m *nats.Msg) {
 		_ = m.Respond(m.Data)
 	})
@@ -137,7 +137,7 @@ func (s *BasicTestSuite) TestServerLeafNodeConfig() {
 	leaf := NewNatsServer(s.T(), &natsserver.Options{ConfigFile: fn})
 	defer leaf.Shutdown()
 
-	lc := leaf.Connect()
+	lc := leaf.RequireConnect()
 	r, err := lc.Request("q", []byte("hello"), 2*time.Second)
 	s.NoError(err)
 	s.Equal(r.Data, []byte("hello"))
@@ -170,7 +170,7 @@ func (s *BasicTestSuite) TestServerConfigAccounts() {
 	})
 	defer ns.Shutdown()
 
-	nc := ns.ConnectWithOptions(nats.Options{User: "auth", Password: "pwd"})
+	nc := ns.RequireConnect(nats.UserInfo("auth", "pwd"))
 	r, err := nc.Request("$SYS.REQ.USER.INFO", []byte{}, time.Second*2)
 	s.NoError(err)
 	var info UserInfo
@@ -213,7 +213,7 @@ func (s *BasicTestSuite) TestServerConfigJetStream() {
 	ns := NewNatsServer(s.T(), opts)
 	defer ns.Shutdown()
 
-	nc := ns.Connect()
+	nc := ns.RequireConnect()
 	defer nc.Close()
 	js, err := jetstream.New(nc)
 	s.NoError(err)
