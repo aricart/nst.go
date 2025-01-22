@@ -71,6 +71,10 @@ func (s *BasicTestSuite) TestServerConfig() {
 
 	conf := Conf{}
 	conf.Authorization.Users.Add(u)
+	conf.WebSocket = &WebSocket{
+		Port:  -1,
+		NoTls: true,
+	}
 
 	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
 
@@ -84,6 +88,11 @@ func (s *BasicTestSuite) TestServerConfig() {
 
 	nc := ns.RequireConnect(nats.UserInfo("a", "b"))
 	defer nc.Close()
+
+	ws, err := ns.WsMaybeConnect(nats.UserInfo("a", "b"))
+	s.NoError(err)
+	s.NotNil(ws)
+	s.Contains(ws.Servers()[0], "ws://127.0.0.1:")
 
 	info := ClientInfo(s.T(), nc)
 	s.Len(info.Data.Permissions.Pub.Allow, 2)

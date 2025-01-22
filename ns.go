@@ -2,6 +2,7 @@ package nst
 
 import (
 	"encoding/json"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -127,6 +128,24 @@ func (ts *NatsServer) MaybeConnect(options ...nats.Option) (*nats.Conn, error) {
 	ts.Lock()
 	defer ts.Unlock()
 	nc, err := nats.Connect(ts.Url, options...)
+	if err == nil {
+		ts.Conns = append(ts.Conns, nc)
+	}
+	return nc, err
+}
+
+func (ts *NatsServer) WsMaybeConnect(opts ...nats.Option) (*nats.Conn, error) {
+	ts.Lock()
+	defer ts.Unlock()
+	var ws string
+	pi := ts.Server.PortsInfo(10 * time.Second)
+	if len(pi.WebSocket) > 0 {
+		ws = pi.WebSocket[0]
+	} else {
+		return nil, errors.New("websocket not enabled")
+	}
+
+	nc, err := nats.Connect(ws, opts...)
 	if err == nil {
 		ts.Conns = append(ts.Conns, nc)
 	}
