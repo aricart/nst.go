@@ -39,6 +39,16 @@ type Conf struct {
 	JetStream     *JetStream    `json:"jetstream,omitempty"`
 	LeafNodes     *LeafNodes    `json:"leafnodes,omitempty"`
 	WriteDeadline string        `json:"write_deadline,omitempty"`
+	WebSocket     *WebSocket    `json:"websocket,omitempty"`
+}
+
+type WebSocket struct {
+	Port        int16  `json:"port,omitempty"`
+	NoTls       bool   `json:"no_tls,omitempty"`
+	JwtCookie   string `json:"jwt_cookie,omitempty"`
+	UserCookie  string `json:"user_cookie,omitempty"`
+	PassCookie  string `json:"pass_cookie,omitempty"`
+	TokenCookie string `json:"token_cookie,omitempty"`
 }
 
 type JetStream struct {
