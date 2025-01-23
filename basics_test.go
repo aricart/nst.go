@@ -331,4 +331,14 @@ func TestPush(t *testing.T) {
 	r, err := Push(nc, c.JWT())
 	require.NoError(t, err)
 	require.Equal(t, 200, r.PushData.Code)
+
+	// connect user from account c
+	uc, err := c.Users().Add("c", "")
+	require.NoError(t, err)
+	d, err = uc.Creds(time.Hour)
+	require.NoError(t, err)
+
+	nc2 := ns.RequireConnect(nats.UserCredentials(td.WriteFile("c.creds", d)))
+	defer nc.Close()
+	t.Log(nc2.ConnectedUrl())
 }
