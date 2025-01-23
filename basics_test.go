@@ -339,6 +339,6 @@ func TestPush(t *testing.T) {
 	require.NoError(t, err)
 
 	nc2 := ns.RequireConnect(nats.UserCredentials(td.WriteFile("c.creds", d)))
-	defer nc.Close()
+	defer nc2.Close()
 	t.Log(nc2.ConnectedUrl())
 }
