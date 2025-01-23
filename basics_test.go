@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -271,4 +272,63 @@ func (s *BasicTestSuite) TestOperator() {
 	defer nc.Close()
 
 	defer ns.Shutdown()
+}
+
+func TestPush(t *testing.T) {
+	td := NewTestDir(t, "", "nst-test")
+	defer td.Cleanup()
+
+	auth, err := authb.NewAuth(nsc.NewNscProvider(fmt.Sprintf("%s/nsc/stores", td.Dir), fmt.Sprintf("%s/nsc/keys", td.Dir)))
+	require.NoError(t, err)
+
+	o, err := auth.Operators().Add("O")
+	require.NoError(t, err)
+
+	sys, err := o.Accounts().Add("SYS")
+	require.NoError(t, err)
+	export, err := sys.Exports().Services().Add("resolver", "$SYS.REQ.CLAIMS.*")
+	require.NoError(t, err)
+	require.NoError(t, export.SetTokenRequired(true))
+	require.NoError(t, o.SetSystemAccount(sys))
+
+	a, err := o.Accounts().Add("A")
+	require.NoError(t, err)
+	si, err := export.GenerateImport()
+	require.NoError(t, err)
+	token, err := export.GenerateActivation(a.Subject(), sys.Subject())
+	require.NoError(t, err)
+	require.NoError(t, si.SetToken(token))
+	require.NoError(t, a.Imports().Services().AddWithConfig(si))
+
+	require.NoError(t, auth.Commit())
+
+	config := ResolverFromAuth(t, o)
+	config.Resolver.Type = "full"
+	config.Resolver.Dir = filepath.Join(td.Dir, "jwts")
+	config.Resolver.AllowDelete = true
+	config.Resolver.UpdateInterval = time.Second * 60
+	config.Resolver.Timeout = time.Second * 2
+
+	ns := NewNatsServer(t, &natsserver.Options{
+		ConfigFile: td.WriteFile("server.conf", config.Marshal(t)),
+		Debug:      true,
+		Trace:      true,
+		NoLog:      false,
+	})
+	defer ns.Shutdown()
+
+	u, err := a.Users().Add("a", "")
+	require.NoError(t, err)
+
+	d, err := u.Creds(time.Hour)
+	require.NoError(t, err)
+	nc := ns.RequireConnect(nats.UserCredentials(td.WriteFile("a.creds", d)))
+	defer nc.Close()
+
+	c, err := o.Accounts().Add("C")
+	require.NoError(t, err)
+
+	r, err := Push(nc, c.JWT())
+	require.NoError(t, err)
+	require.Equal(t, 200, r.PushData.Code)
 }

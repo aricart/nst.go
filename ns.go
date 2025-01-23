@@ -193,11 +193,11 @@ func ClientInfo(t testing.TB, nc *nats.Conn) UserInfo {
 //	return kv
 //}
 
-//	type ErrorDetails struct {
-//		Account     string `json:"account"`
-//		Code        int    `json:"code"`
-//		Description string `json:"description"`
-//	}
+type ErrorDetails struct {
+	Account     string `json:"account"`
+	Code        int    `json:"code"`
+	Description string `json:"description"`
+}
 type ServerDetails struct {
 	Name      string    `json:"name"`
 	Host      string    `json:"host"`
@@ -221,35 +221,43 @@ type UserInfo struct {
 	Data UserData `json:"data"`
 }
 
-//
-//type PushResponse struct {
-//	Error  *ErrorDetails `json:"error,omitempty"`
-//	Server ServerDetails `json:"server"`
-//}
+type PushData struct {
+	Account string `json:"account"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
 
-//func (ts *NatsServer) AddAccount(name string) {
-//	if ts.Resolver == nil {
-//		ts.t.Fatal("AddAccount only works with resolver configurations")
-//	}
-//	ts.Resolver.NewAccount(name)
-//	ts.pushAccount(ts.t, name)
-//}
+type PushResponse struct {
+	Error    *ErrorDetails `json:"error,omitempty"`
+	Server   ServerDetails `json:"server"`
+	PushData PushData      `json:"data"`
+}
+
+//a := ts.Resolver.Identities.Accounts[name]
+//require.NotNil(t, a)
 //
-//func (ts *NatsServer) pushAccount(t *testing.T, name string) {
-//	a := ts.Resolver.Identities.Accounts[name]
-//	require.NotNil(t, a)
+//nc, err := ts.ConnectAccount("SYS", "sys", false)
+//require.NoError(t, err)
+//defer nc.Close()
 //
-//	nc, err := ts.ConnectAccount("SYS", "sys", false)
-//	require.NoError(t, err)
-//	defer nc.Close()
+//m, err := nc.Request("$SYS.REQ.CLAIMS.UPDATE", []byte(a.Token), time.Second*2)
+//require.NoError(t, err)
+//require.NotNil(t, m)
+//require.NotEmpty(t, m.Data)
 //
-//	m, err := nc.Request("$SYS.REQ.CLAIMS.UPDATE", []byte(a.Token), time.Second*2)
-//	require.NoError(t, err)
-//	require.NotNil(t, m)
-//	require.NotEmpty(t, m.Data)
-//
-//	var v PushResponse
-//	err = json.Unmarshal(m.Data, &v)
-//	require.NoError(t, err)
-//	require.Nil(t, v.Error)
-//}
+//var v PushResponse
+//err = json.Unmarshal(m.Data, &v)
+//require.NoError(t, err)
+//require.Nil(t, v.Error)
+
+// Push a JWT to a nats resolver
+func Push(nc *nats.Conn, token string) (*PushResponse, error) {
+	m, err := nc.Request("$SYS.REQ.CLAIMS.UPDATE", []byte(token), time.Second*2)
+	if err != nil {
+		return nil, err
+	}
+
+	var v PushResponse
+	err = json.Unmarshal(m.Data, &v)
+	return &v, err
+}
