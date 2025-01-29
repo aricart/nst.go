@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/jwt/v2"
+	authb "github.com/synadia-io/jwt-auth-builder.go"
+
 	"dario.cat/mergo"
 
 	"github.com/nats-io/nats-server/v2/server"
@@ -221,16 +224,32 @@ type UserInfo struct {
 	Data UserData `json:"data"`
 }
 
-type PushData struct {
+type UpdateData struct {
 	Account string `json:"account"`
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
-type PushResponse struct {
-	Error    *ErrorDetails `json:"error,omitempty"`
-	Server   ServerDetails `json:"server"`
-	PushData PushData      `json:"data"`
+type ResolverResponse struct {
+	Error  *ErrorDetails `json:"error,omitempty"`
+	Server ServerDetails `json:"server"`
+}
+
+type ResolverUpdateResponse struct {
+	ResolverResponse
+	UpdateData UpdateData `json:"data"`
+}
+
+type ResolverListResponse struct {
+	ResolverResponse
+	Accounts []string `json:"data"`
+}
+
+func DeleteRequestToken(operator authb.Operator, key string, account ...string) (string, error) {
+	r := jwt.NewGenericClaims(key)
+	r.Data = make(map[string]interface{})
+	r.Data["accounts"] = account
+	return operator.IssueClaim(r, key)
 }
 
 //a := ts.Resolver.Identities.Accounts[name]
@@ -245,19 +264,36 @@ type PushResponse struct {
 //require.NotNil(t, m)
 //require.NotEmpty(t, m.Data)
 //
-//var v PushResponse
+//var v ResolverResponse
 //err = json.Unmarshal(m.Data, &v)
 //require.NoError(t, err)
 //require.Nil(t, v.Error)
 
 // Push a JWT to a nats resolver
-func Push(nc *nats.Conn, token string) (*PushResponse, error) {
-	m, err := nc.Request("$SYS.REQ.CLAIMS.UPDATE", []byte(token), time.Second*2)
-	if err != nil {
-		return nil, err
-	}
 
-	var v PushResponse
-	err = json.Unmarshal(m.Data, &v)
-	return &v, err
+func resolverRequest(nc *nats.Conn, subj string, payload string, resp any) error {
+	m, err := nc.Request(subj, []byte(payload), time.Second*2)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(m.Data, resp)
+}
+
+func UpdateAccount(nc *nats.Conn, token string) (*ResolverUpdateResponse, error) {
+	var r ResolverUpdateResponse
+	err := resolverRequest(nc, "$SYS.REQ.CLAIMS.UPDATE", token, &r)
+	return &r, err
+}
+
+// DeleteAccount will only work if https://github.com/nats-io/nats-server/pull/6427 is merged
+func DeleteAccount(nc *nats.Conn, token string) (*ResolverResponse, error) {
+	var r ResolverResponse
+	err := resolverRequest(nc, "$SYS.REQ.CLAIMS.DELETE", token, &r)
+	return &r, err
+}
+
+func ListAccounts(nc *nats.Conn) (*ResolverListResponse, error) {
+	var r ResolverListResponse
+	err := resolverRequest(nc, "$SYS.REQ.CLAIMS.LIST", "", &r)
+	return &r, err
 }

@@ -13,7 +13,7 @@ import (
 
 func ResolverFromAuth(t testing.TB, operator authb.Operator) *ResolverConf {
 	var config ResolverConf
-	config.Resolver.Type = "mem"
+	config.Resolver.Type = MemResolver
 
 	require.NotNil(t, operator)
 	config.Operator = operator.JWT()
@@ -32,14 +32,15 @@ func ResolverFromAuth(t testing.TB, operator authb.Operator) *ResolverConf {
 
 // Conf rudimentary struct representing a configuration, missing most :)
 type Conf struct {
-	Include       string        `json:"include,omitempty"`
-	Accounts      Accounts      `json:"accounts,omitempty"`
-	SystemAccount *string       `json:"system_account,omitempty"`
-	Authorization Authorization `json:"authorization,omitempty"`
-	JetStream     *JetStream    `json:"jetstream,omitempty"`
-	LeafNodes     *LeafNodes    `json:"leafnodes,omitempty"`
-	WriteDeadline string        `json:"write_deadline,omitempty"`
-	WebSocket     *WebSocket    `json:"websocket,omitempty"`
+	Include        string        `json:"include,omitempty"`
+	Accounts       Accounts      `json:"accounts,omitempty"`
+	SystemAccount  *string       `json:"system_account,omitempty"`
+	Authorization  Authorization `json:"authorization,omitempty"`
+	JetStream      *JetStream    `json:"jetstream,omitempty"`
+	LeafNodes      *LeafNodes    `json:"leafnodes,omitempty"`
+	WriteDeadline  string        `json:"write_deadline,omitempty"`
+	WebSocket      *WebSocket    `json:"websocket,omitempty"`
+	MonitoringPort string        `json:"monitoring_port,omitempty"`
 }
 
 type WebSocket struct {
@@ -138,14 +139,23 @@ type AllowDeny struct {
 
 // ResolverConf a Conf using delegated authentication
 type ResolverConf struct {
+	Conf
 	Operator      string            `json:"operator,omitempty"`
 	SystemAccount string            `json:"system_account,omitempty"`
 	Resolver      Resolver          `json:"resolver,omitempty"`
 	Preload       map[string]string `json:"resolver_preload,omitempty"`
 }
 
+type ResolverType string
+
+const (
+	FullResolver  ResolverType = "FULL"
+	MemResolver   ResolverType = "MEMORY"
+	CacheResolver ResolverType = "CACHE"
+)
+
 type Resolver struct {
-	Type           string        `json:"type,omitempty"`
+	Type           ResolverType  `json:"type,omitempty"`
 	Dir            string        `json:"dir,omitempty"`
 	AllowDelete    bool          `json:"allow_delete,omitempty"`
 	UpdateInterval time.Duration `json:"interval,omitempty"`
