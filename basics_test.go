@@ -303,7 +303,7 @@ func TestPush(t *testing.T) {
 	require.NoError(t, auth.Commit())
 
 	config := ResolverFromAuth(t, o)
-	config.Resolver.Type = "full"
+	config.Resolver.Type = FullResolver
 	config.Resolver.Dir = filepath.Join(td.Dir, "jwts")
 	config.Resolver.AllowDelete = true
 	config.Resolver.UpdateInterval = time.Second * 60
@@ -325,12 +325,19 @@ func TestPush(t *testing.T) {
 	nc := ns.RequireConnect(nats.UserCredentials(td.WriteFile("a.creds", d)))
 	defer nc.Close()
 
+	// list
+	list, err := ListAccounts(nc)
+	require.NoError(t, err)
+	require.Len(t, list.Accounts, 2)
+	t.Logf("%+v", list)
+
 	c, err := o.Accounts().Add("C")
 	require.NoError(t, err)
 
-	r, err := Push(nc, c.JWT())
+	ur, err := UpdateAccount(nc, c.JWT())
 	require.NoError(t, err)
-	require.Equal(t, 200, r.PushData.Code)
+	require.Equal(t, 200, ur.UpdateData.Code)
+	t.Logf("%+v", ur)
 
 	// connect user from account c
 	uc, err := c.Users().Add("c", "")
@@ -339,6 +346,19 @@ func TestPush(t *testing.T) {
 	require.NoError(t, err)
 
 	nc2 := ns.RequireConnect(nats.UserCredentials(td.WriteFile("c.creds", d)))
-	defer nc2.Close()
 	t.Log(nc2.ConnectedUrl())
+	nc2.Close()
+
+	lr, err := ListAccounts(nc)
+	require.NoError(t, err)
+
+	require.Contains(t, lr.Accounts, sys.Subject())
+	require.Contains(t, lr.Accounts, c.Subject())
+	require.Contains(t, lr.Accounts, a.Subject())
+
+	token, err = DeleteRequestToken(o, o.Subject(), c.Subject())
+	require.NoError(t, err)
+	// this will not delete if the server doesn't have https://github.com/nats-io/nats-server/pull/6427
+	_, err = DeleteAccount(nc, token)
+	require.NoError(t, err)
 }
