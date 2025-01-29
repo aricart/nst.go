@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/jwt/v2"
+
 	"github.com/nats-io/nkeys"
 
 	authb "github.com/synadia-io/jwt-auth-builder.go"
@@ -317,16 +319,20 @@ func TestPush(t *testing.T) {
 	})
 	defer ns.Shutdown()
 
+	sysU, err := sys.Users().Add("sys", "")
+	require.NoError(t, err)
+	d, err := sysU.Creds(time.Hour)
+	sysNc := ns.RequireConnect(nats.UserCredentials(td.WriteFile("sys.creds", d)))
+
 	u, err := a.Users().Add("a", "")
 	require.NoError(t, err)
-
-	d, err := u.Creds(time.Hour)
+	d, err = u.Creds(time.Hour)
 	require.NoError(t, err)
 	nc := ns.RequireConnect(nats.UserCredentials(td.WriteFile("a.creds", d)))
 	defer nc.Close()
 
 	// list
-	list, err := ListAccounts(nc)
+	list, err := ListAccounts(sysNc)
 	require.NoError(t, err)
 	require.Len(t, list.Accounts, 2)
 	t.Logf("%+v", list)
@@ -334,7 +340,7 @@ func TestPush(t *testing.T) {
 	c, err := o.Accounts().Add("C")
 	require.NoError(t, err)
 
-	ur, err := UpdateAccount(nc, c.JWT())
+	ur, err := UpdateAccount(sysNc, c.JWT())
 	require.NoError(t, err)
 	require.Equal(t, 200, ur.UpdateData.Code)
 	t.Logf("%+v", ur)
@@ -349,16 +355,22 @@ func TestPush(t *testing.T) {
 	t.Log(nc2.ConnectedUrl())
 	nc2.Close()
 
-	lr, err := ListAccounts(nc)
+	lr, err := ListAccounts(sysNc)
 	require.NoError(t, err)
 
 	require.Contains(t, lr.Accounts, sys.Subject())
 	require.Contains(t, lr.Accounts, c.Subject())
 	require.Contains(t, lr.Accounts, a.Subject())
 
+	token, err = GetAccount(sysNc, c.Subject())
+	require.NoError(t, err)
+	cc, err := jwt.DecodeAccountClaims(token)
+	require.NoError(t, err)
+	require.Equal(t, cc.Subject, c.Subject())
+
 	token, err = DeleteRequestToken(o, o.Subject(), c.Subject())
 	require.NoError(t, err)
 	// this will not delete if the server doesn't have https://github.com/nats-io/nats-server/pull/6427
-	_, err = DeleteAccount(nc, token)
+	_, err = DeleteAccount(sysNc, token)
 	require.NoError(t, err)
 }

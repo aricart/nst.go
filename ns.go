@@ -3,6 +3,7 @@ package nst
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -252,25 +253,6 @@ func DeleteRequestToken(operator authb.Operator, key string, account ...string) 
 	return operator.IssueClaim(r, key)
 }
 
-//a := ts.Resolver.Identities.Accounts[name]
-//require.NotNil(t, a)
-//
-//nc, err := ts.ConnectAccount("SYS", "sys", false)
-//require.NoError(t, err)
-//defer nc.Close()
-//
-//m, err := nc.Request("$SYS.REQ.CLAIMS.UPDATE", []byte(a.Token), time.Second*2)
-//require.NoError(t, err)
-//require.NotNil(t, m)
-//require.NotEmpty(t, m.Data)
-//
-//var v ResolverResponse
-//err = json.Unmarshal(m.Data, &v)
-//require.NoError(t, err)
-//require.Nil(t, v.Error)
-
-// Push a JWT to a nats resolver
-
 func resolverRequest(nc *nats.Conn, subj string, payload string, resp any) error {
 	m, err := nc.Request(subj, []byte(payload), time.Second*2)
 	if err != nil {
@@ -296,4 +278,12 @@ func ListAccounts(nc *nats.Conn) (*ResolverListResponse, error) {
 	var r ResolverListResponse
 	err := resolverRequest(nc, "$SYS.REQ.CLAIMS.LIST", "", &r)
 	return &r, err
+}
+
+func GetAccount(nc *nats.Conn, id string) (string, error) {
+	m, err := nc.Request(fmt.Sprintf("$SYS.REQ.ACCOUNT.%s.CLAIMS.LOOKUP", id), nil, time.Second*2)
+	if err != nil {
+		return "", err
+	}
+	return string(m.Data), err
 }
