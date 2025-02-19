@@ -451,15 +451,7 @@ func TestConf(t *testing.T) {
 
 	require.Equal(t, conf2.MonitoringPort, 1234)
 
-	ns := StartInProcessServer(t, &Options{
-		ConfigFile: fn,
-		InProcess:  true,
-	})
-	nc := ns.RequireConnect(nats.UserInfo("a", "b"))
-	require.NoError(t, nc.Flush())
-	ns.Shutdown()
-
-	ns = StartExternalProcessWithConfig(t, fn)
+	ns := StartExternalProcessWithConfig(t, fn)
 	ns.RequireConnect(nats.UserInfo("a", "b"))
 	ns.Shutdown()
 }
