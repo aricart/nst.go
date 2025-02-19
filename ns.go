@@ -86,12 +86,7 @@ func NewNatsServer(dir *TestDir, opts *Options) NatsServer {
 		}
 	}
 	opts.ConfigFile = dir.WriteFile("server.conf", conf.Marshal(t))
-
-	if opts.InProcess {
-		return StartInProcessServer(t, opts)
-	} else {
-		return StartExternalProcessWithConfig(t, opts.ConfigFile)
-	}
+	return StartExternalProcessWithConfig(t, opts.ConfigFile)
 }
 
 //func StartNatsServer(t testing.TB, opts *Options) (NatsServer, string) {
