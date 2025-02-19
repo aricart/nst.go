@@ -1,289 +1,99 @@
 package nst
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"sync"
-	"testing"
-	"time"
-
-	"github.com/nats-io/jwt/v2"
-	authb "github.com/synadia-io/jwt-auth-builder.go"
+	"path/filepath"
 
 	"dario.cat/mergo"
-
-	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/require"
 )
 
 const UserInfoSubj = "$SYS.REQ.USER.INFO"
 
-// NatsServer represents a nats-server
-type NatsServer struct {
-	sync.Mutex
-	t      testing.TB
-	Server *server.Server
-	// Resolver *ResolverConf
-	Url   string
-	Conns []*nats.Conn
+type NatsServer interface {
+	// RequireConnect creates a connection that is not expected to fail, if it fail test will fail
+	RequireConnect(opts ...nats.Option) *nats.Conn
+	// MaybeConnect attempts to create a TCP connection
+	MaybeConnect(options ...nats.Option) (*nats.Conn, error)
+	// WsMaybeConnect attempts to create a connection via WebSocket.
+	WsMaybeConnect(opts ...nats.Option) (*nats.Conn, error)
+	// TrackConn simply adds a connection made to the server via direct client API to be discarded on ShutDown
+	TrackConn(conn ...*nats.Conn)
+	// UntrackedConnection convenience function to create a connection that is not tracked
+	UntrackedConnection(opts ...nats.Option) (*nats.Conn, error)
+	// Shutdown stop the server closing all connections initiated via the API if tracked.
+	Shutdown()
 }
 
-//func NewNatsServerWithResolverConfig(t *testing.T, opts *server.Options) *NatsServer {
-//	if opts != nil && opts.ConfigFile != "" {
-//		t.Fatal("config file option is not valid when using the resolver")
-//	}
-//
-//	tempDir, err := os.MkdirTemp(os.TempDir(), "callout_test")
-//	require.NoError(t, err)
-//	t.Log(tempDir)
-//
-//	if opts == nil {
-//		opts = DefaultNatsServerOptions()
-//	}
-//
-//	rc := NewResolverConfig(t, tempDir)
-//	config := rc.Store(tempDir)
-//	opts.ConfigFile = config
-//
-//	ns, u := SetupNatsServerUsingDir(t, opts, tempDir)
-//	return &NatsServer{
-//		t:        t,
-//		Server:   ns,
-//		Url:      u,
-//		Resolver: rc,
-//	}
-//}
-
-func NewNatsServer(t testing.TB, opts *server.Options) *NatsServer {
-	ns, u := StartNatsServer(t, opts)
-	return &NatsServer{
-		t:      t,
-		Server: ns,
-		Url:    u,
-	}
+type Options struct {
+	Debug      bool
+	Trace      bool
+	ConfigFile string
+	Port       int
+	JetStream  bool
+	StoreDir   string
+	InProcess  bool
 }
 
-func StartNatsServer(t testing.TB, opts *server.Options) (*server.Server, string) {
-	defaults := DefaultNatsServerOptions()
-	if opts == nil {
-		opts = DefaultNatsServerOptions()
+func DefaultNatsServerOptions() *Options {
+	return &Options{
+		Port: -1,
 	}
-
-	err := mergo.Merge(opts, defaults)
-	require.NoError(t, err)
-
-	if opts.ConfigFile != "" {
-		require.NoError(t, opts.ProcessConfigFile(opts.ConfigFile))
-	}
-
-	s, err := server.NewServer(opts)
-	require.NoError(t, err)
-
-	go s.Start()
-	if !s.ReadyForConnections(10 * time.Second) {
-		t.Fatal("Unable to start NATS Server in Go Routine")
-	}
-
-	ports := s.PortsInfo(10 * time.Second)
-
-	return s, ports.Nats[0]
 }
 
 // DefaultNatsServerWithJetStreamOptions basic config for supporting JetStream
-func DefaultNatsServerWithJetStreamOptions(tempDir string) *server.Options {
+func DefaultNatsServerWithJetStreamOptions(tempDir string) *Options {
 	opts := DefaultNatsServerOptions()
 	opts.JetStream = true
 	opts.StoreDir = tempDir
 	return opts
 }
 
-// DefaultNatsServerOptions returns a core NATS configuration
-func DefaultNatsServerOptions() *server.Options {
-	return &server.Options{
-		Debug:                 true,
-		Trace:                 true,
-		Host:                  "127.0.0.1",
-		Port:                  -1,
-		NoLog:                 false,
-		NoSigs:                true,
-		MaxControlLine:        4096,
-		DisableShortFirstPing: true,
+func NewNatsServer(dir *TestDir, opts *Options) NatsServer {
+	t := dir.t
+	// sanity in the options
+	if opts == nil {
+		opts = DefaultNatsServerOptions()
 	}
-}
-
-func (ts *NatsServer) TrackConn(conn ...*nats.Conn) {
-	ts.Lock()
-	defer ts.Unlock()
-	ts.Conns = append(ts.Conns, conn...)
-}
-
-// RequireConnect returns a connection, the server must not have auth enabled
-func (ts *NatsServer) RequireConnect(opts ...nats.Option) *nats.Conn {
-	nc, err := ts.UntrackedConnection(opts...)
-	require.NoError(ts.t, err)
-	ts.TrackConn(nc)
-	return nc
-}
-
-// MaybeConnect this connection could fail and tests want to verify it
-func (ts *NatsServer) MaybeConnect(options ...nats.Option) (*nats.Conn, error) {
-	ts.Lock()
-	defer ts.Unlock()
-	nc, err := nats.Connect(ts.Url, options...)
-	if err == nil {
-		ts.Conns = append(ts.Conns, nc)
+	if err := mergo.Merge(opts, DefaultNatsServerOptions()); err != nil {
+		require.NoError(t, err)
 	}
-	return nc, err
-}
+	if opts.JetStream && opts.StoreDir == "" {
+		opts.StoreDir = filepath.Join(dir.Dir, "jetstream")
+	}
 
-func (ts *NatsServer) WsMaybeConnect(opts ...nats.Option) (*nats.Conn, error) {
-	ts.Lock()
-	defer ts.Unlock()
-	var ws string
-	pi := ts.Server.PortsInfo(10 * time.Second)
-	if len(pi.WebSocket) > 0 {
-		ws = pi.WebSocket[0]
+	var conf *ResolverConf
+	if opts.ConfigFile != "" {
+		conf = ParseConf(t, opts.ConfigFile)
 	} else {
-		return nil, errors.New("websocket not enabled")
+		conf = &ResolverConf{}
 	}
+	conf.Port = opts.Port
 
-	nc, err := nats.Connect(ws, opts...)
-	if err == nil {
-		ts.Conns = append(ts.Conns, nc)
+	if opts.Debug {
+		conf.Debug = true
 	}
-	return nc, err
+	if opts.Trace {
+		conf.Trace = true
+	}
+	if opts.JetStream {
+		conf.JetStream = &JetStream{
+			StoreDir: opts.StoreDir,
+		}
+	}
+	opts.ConfigFile = dir.WriteFile("server.conf", conf.Marshal(t))
+
+	if opts.InProcess {
+		return StartInProcessServer(t, opts)
+	} else {
+		return StartExternalProcessWithConfig(t, opts.ConfigFile)
+	}
 }
 
-func (ts *NatsServer) UntrackedConnection(opts ...nats.Option) (*nats.Conn, error) {
-	return nats.Connect(ts.Url, opts...)
-}
-
-//func (ts *NatsServer) ConnectAccount(account string, user string, bearer bool) (*nats.Conn, error) {
-//	u := ts.Resolver.Identities.CreateUser(account, user, bearer)
-//	return ts.MaybeConnect(u.ConnectOptions())
+//func StartNatsServer(t testing.TB, opts *Options) (NatsServer, string) {
+//	if opts.InProcess {
+//		return StartInProcessServer(t, opts)
+//	} else {
+//		StartExternalProcess(t, opts)
+//	}
 //}
-
-// Shutdown Stops closes all current connections initiated via this API and shutsdown
-// the server
-func (ts *NatsServer) Shutdown() {
-	ts.Lock()
-	defer ts.Unlock()
-	for _, c := range ts.Conns {
-		c.Close()
-	}
-	ts.Server.Shutdown()
-}
-
-func ClientInfo(t testing.TB, nc *nats.Conn) UserInfo {
-	r, err := nc.Request(UserInfoSubj, nil, time.Second*2)
-	require.NoError(t, err)
-	require.NotNil(t, r)
-	var info UserInfo
-	require.NoError(t, json.Unmarshal(r.Data, &info))
-	return info
-}
-
-//func (ts *NatsServer) NewKv(bucket string) jetstream.KeyValue {
-//	nc := ts.RequireConnect()
-//	js, err := jetstream.New(nc)
-//	require.NoError(ts.t, err)
-//
-//	kv, err := js.CreateKeyValue(context.Background(), jetstream.KeyValueConfig{
-//		Bucket: bucket,
-//	})
-//	require.NoError(ts.t, err)
-//	return kv
-//}
-
-type ErrorDetails struct {
-	Account     string `json:"account"`
-	Code        int    `json:"code"`
-	Description string `json:"description"`
-}
-type ServerDetails struct {
-	Name      string    `json:"name"`
-	Host      string    `json:"host"`
-	ID        string    `json:"id"`
-	Version   string    `json:"ver"`
-	Jetstream bool      `json:"jetstream"`
-	Flags     int       `json:"flags"`
-	Sequence  int       `json:"seq"`
-	Time      time.Time `json:"time"`
-}
-
-type UserData struct {
-	User        string      `json:"user"`
-	Account     string      `json:"account"`
-	Permissions Permissions `json:"permissions"`
-	Expires     int64       `json:"expires"`
-}
-
-type UserInfo struct {
-	ServerDetails
-	Data UserData `json:"data"`
-}
-
-type UpdateData struct {
-	Account string `json:"account"`
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-type ResolverResponse struct {
-	Error  *ErrorDetails `json:"error,omitempty"`
-	Server ServerDetails `json:"server"`
-}
-
-type ResolverUpdateResponse struct {
-	ResolverResponse
-	UpdateData UpdateData `json:"data"`
-}
-
-type ResolverListResponse struct {
-	ResolverResponse
-	Accounts []string `json:"data"`
-}
-
-func DeleteRequestToken(operator authb.Operator, key string, account ...string) (string, error) {
-	r := jwt.NewGenericClaims(key)
-	r.Data = make(map[string]interface{})
-	r.Data["accounts"] = account
-	return operator.IssueClaim(r, key)
-}
-
-func resolverRequest(nc *nats.Conn, subj string, payload string, resp any) error {
-	m, err := nc.Request(subj, []byte(payload), time.Second*2)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(m.Data, resp)
-}
-
-func UpdateAccount(nc *nats.Conn, token string) (*ResolverUpdateResponse, error) {
-	var r ResolverUpdateResponse
-	err := resolverRequest(nc, "$SYS.REQ.CLAIMS.UPDATE", token, &r)
-	return &r, err
-}
-
-// DeleteAccount will only work if https://github.com/nats-io/nats-server/pull/6427 is merged
-func DeleteAccount(nc *nats.Conn, token string) (*ResolverResponse, error) {
-	var r ResolverResponse
-	err := resolverRequest(nc, "$SYS.REQ.CLAIMS.DELETE", token, &r)
-	return &r, err
-}
-
-func ListAccounts(nc *nats.Conn) (*ResolverListResponse, error) {
-	var r ResolverListResponse
-	err := resolverRequest(nc, "$SYS.REQ.CLAIMS.LIST", "", &r)
-	return &r, err
-}
-
-func GetAccount(nc *nats.Conn, id string) (string, error) {
-	m, err := nc.Request(fmt.Sprintf("$SYS.REQ.ACCOUNT.%s.CLAIMS.LOOKUP", id), nil, time.Second*2)
-	if err != nil {
-		return "", err
-	}
-	return string(m.Data), err
-}

@@ -3,8 +3,8 @@ package nst
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"testing"
-	"time"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
@@ -13,6 +13,7 @@ import (
 
 func ResolverFromAuth(t testing.TB, operator authb.Operator) *ResolverConf {
 	var config ResolverConf
+	config.Resolver = &Resolver{}
 	config.Resolver.Type = MemResolver
 
 	require.NotNil(t, operator)
@@ -30,8 +31,18 @@ func ResolverFromAuth(t testing.TB, operator authb.Operator) *ResolverConf {
 	return &config
 }
 
+func DefaultConfig(t testing.TB) *Conf {
+	return &Conf{
+		Port: -1,
+	}
+}
+
 // Conf rudimentary struct representing a configuration, missing most :)
 type Conf struct {
+	PortsFileDir   string        `json:"ports_file_dir,omitempty"`
+	Debug          bool          `json:"debug,omitempty"`
+	Trace          bool          `json:"trace,omitempty"`
+	Port           int           `json:"port,omitempty"`
 	Include        string        `json:"include,omitempty"`
 	Accounts       Accounts      `json:"accounts,omitempty"`
 	SystemAccount  *string       `json:"system_account,omitempty"`
@@ -40,11 +51,11 @@ type Conf struct {
 	LeafNodes      *LeafNodes    `json:"leafnodes,omitempty"`
 	WriteDeadline  string        `json:"write_deadline,omitempty"`
 	WebSocket      *WebSocket    `json:"websocket,omitempty"`
-	MonitoringPort string        `json:"monitoring_port,omitempty"`
+	MonitoringPort int           `json:"http,omitempty"`
 }
 
 type WebSocket struct {
-	Port        int16  `json:"port,omitempty"`
+	Port        int    `json:"port,omitempty"`
 	NoTls       bool   `json:"no_tls,omitempty"`
 	JwtCookie   string `json:"jwt_cookie,omitempty"`
 	UserCookie  string `json:"user_cookie,omitempty"`
@@ -60,7 +71,7 @@ type JetStream struct {
 }
 
 type LeafNodes struct {
-	Port    int16    `json:"port,omitempty"`
+	Port    int      `json:"port,omitempty"`
 	Remotes []Remote `json:"remotes,omitempty"`
 }
 
@@ -75,10 +86,20 @@ type Remote struct {
 func (c Conf) Marshal(t testing.TB) []byte {
 	buffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(buffer)
+	encoder.SetIndent("", "  ")
 	encoder.SetEscapeHTML(false)
 	err := encoder.Encode(c)
 	require.NoError(t, err)
 	return buffer.Bytes()
+}
+
+func ParseConf(t testing.TB, fp string) *ResolverConf {
+	d, err := os.ReadFile(fp)
+	require.NoError(t, err)
+
+	var c ResolverConf
+	require.NoError(t, json.Unmarshal(d, &c))
+	return &c
 }
 
 // Authorization block
@@ -142,7 +163,7 @@ type ResolverConf struct {
 	Conf
 	Operator      string            `json:"operator,omitempty"`
 	SystemAccount string            `json:"system_account,omitempty"`
-	Resolver      Resolver          `json:"resolver,omitempty"`
+	Resolver      *Resolver         `json:"resolver,omitempty"`
 	Preload       map[string]string `json:"resolver_preload,omitempty"`
 }
 
@@ -155,29 +176,19 @@ const (
 )
 
 type Resolver struct {
-	Type           ResolverType  `json:"type,omitempty"`
-	Dir            string        `json:"dir,omitempty"`
-	AllowDelete    bool          `json:"allow_delete,omitempty"`
-	UpdateInterval time.Duration `json:"interval,omitempty"`
-	Timeout        time.Duration `json:"timeout,omitempty"`
+	Type           ResolverType `json:"type,omitempty"`
+	Dir            string       `json:"dir,omitempty"`
+	AllowDelete    bool         `json:"allow_delete,omitempty"`
+	UpdateInterval string       `json:"interval,omitempty"`
+	Timeout        string       `json:"timeout,omitempty"`
 }
 
-func (r *ResolverConf) Marshal(t *testing.T) []byte {
-	d, err := json.MarshalIndent(r, "", "  ")
+func (r *ResolverConf) Marshal(t testing.TB) []byte {
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetIndent("", "  ")
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(r)
 	require.NoError(t, err)
-	return d
-}
-
-func (r *Resolver) MarshalJSON() ([]byte, error) {
-	type RC struct {
-		Resolver
-		SInterval string `json:"interval"`
-		STimeout  string `json:"timeout"`
-	}
-
-	rc := RC{Resolver: *r}
-	rc.SInterval = r.UpdateInterval.String()
-	rc.STimeout = r.Timeout.String()
-
-	return json.Marshal(rc)
+	return buffer.Bytes()
 }
