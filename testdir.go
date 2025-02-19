@@ -15,6 +15,9 @@ type TestDir struct {
 }
 
 func NewTestDir(t testing.TB, dir string, pattern string) *TestDir {
+	if dir == "" {
+		dir = t.TempDir()
+	}
 	dirPath, err := os.MkdirTemp(dir, pattern)
 	require.NoError(t, err)
 	return &TestDir{t: t, Dir: dirPath}

@@ -1,7 +1,7 @@
 # this needs `tasks` and `node` installed
 # brew install go-task - https://taskfile.dev
 # task setup
-version: '3'
+version: "3"
 
 tasks:
   cover:

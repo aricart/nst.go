@@ -4,23 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/nats-io/jwt/v2"
-
-	"github.com/nats-io/nkeys"
-
-	authb "github.com/synadia-io/jwt-auth-builder.go"
-	"github.com/synadia-io/jwt-auth-builder.go/providers/nsc"
-
-	"github.com/nats-io/nats.go/jetstream"
-
-	natsserver "github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
+	"github.com/nats-io/nkeys"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	authb "github.com/synadia-io/jwt-auth-builder.go"
+	"github.com/synadia-io/jwt-auth-builder.go/providers/nsc"
 )
 
 type BasicTestSuite struct {
@@ -41,7 +37,10 @@ func (s *BasicTestSuite) TestDirBasics() {
 }
 
 func (s *BasicTestSuite) TestSimpleServer() {
-	ns := NewNatsServer(s.T(), nil)
+	dir := NewTestDir(s.T(), "", "nst-test")
+	defer dir.Cleanup()
+
+	ns := NewNatsServer(dir, nil)
 	defer ns.Shutdown()
 
 	nc := ns.RequireConnect()
@@ -57,7 +56,10 @@ func (s *BasicTestSuite) TestSimpleServer() {
 }
 
 func (s *BasicTestSuite) TestShutdownClosesClients() {
-	ns := NewNatsServer(s.T(), nil)
+	dir := NewTestDir(s.T(), "", "nst-test")
+	defer dir.Cleanup()
+
+	ns := NewNatsServer(dir, nil)
 	nc := ns.RequireConnect()
 	ns.Shutdown()
 	s.True(nc.IsClosed())
@@ -73,6 +75,7 @@ func (s *BasicTestSuite) TestServerConfig() {
 	u.Permissions.Sub.Allow.Add("_INBOX.>")
 
 	conf := Conf{}
+	conf.Debug = true
 	conf.Authorization.Users.Add(u)
 	conf.WebSocket = &WebSocket{
 		Port:  -1,
@@ -81,11 +84,8 @@ func (s *BasicTestSuite) TestServerConfig() {
 
 	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
 
-	ns := NewNatsServer(s.T(), &natsserver.Options{
+	ns := NewNatsServer(td, &Options{
 		ConfigFile: fn,
-		Debug:      true,
-		Trace:      true,
-		NoLog:      false,
 	})
 	defer ns.Shutdown()
 
@@ -116,10 +116,12 @@ func (s *BasicTestSuite) TestServerJetStreamServerConfig() {
 	}
 	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
 
-	ns := NewNatsServer(s.T(), &natsserver.Options{ConfigFile: fn})
+	ns := NewNatsServer(td, &Options{ConfigFile: fn})
 	defer ns.Shutdown()
 
-	s.True(ns.Server.JetStreamEnabled())
+	fi, err := os.Stat(filepath.Join(td.Dir, "js"))
+	s.NoError(err)
+	s.True(fi.IsDir())
 }
 
 func (s *BasicTestSuite) TestServerLeafNodeConfig() {
@@ -131,7 +133,7 @@ func (s *BasicTestSuite) TestServerLeafNodeConfig() {
 		Port: 7422,
 	}
 	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
-	ns := NewNatsServer(s.T(), &natsserver.Options{ConfigFile: fn})
+	ns := NewNatsServer(td, &Options{ConfigFile: fn})
 	defer ns.Shutdown()
 
 	nc := ns.RequireConnect()
@@ -146,7 +148,7 @@ func (s *BasicTestSuite) TestServerLeafNodeConfig() {
 		Remote{Urls: []string{"nats://127.0.0.1:7422"}})
 
 	fn = td.WriteFile("leafnode.conf", ln.Marshal(s.T()))
-	leaf := NewNatsServer(s.T(), &natsserver.Options{ConfigFile: fn})
+	leaf := NewNatsServer(td, &Options{ConfigFile: fn})
 	defer leaf.Shutdown()
 
 	lc := leaf.RequireConnect()
@@ -174,11 +176,8 @@ func (s *BasicTestSuite) TestServerConfigAccounts() {
 
 	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
 
-	ns := NewNatsServer(s.T(), &natsserver.Options{
+	ns := NewNatsServer(td, &Options{
 		ConfigFile: fn,
-		Debug:      true,
-		Trace:      true,
-		NoLog:      false,
 	})
 	defer ns.Shutdown()
 
@@ -201,17 +200,10 @@ func (s *BasicTestSuite) TestSys() {
 
 	fn := td.WriteFile("server.conf", conf.Marshal(s.T()))
 
-	ns := NewNatsServer(s.T(), &natsserver.Options{
+	ns := NewNatsServer(td, &Options{
 		ConfigFile: fn,
-		Debug:      true,
-		Trace:      true,
-		NoLog:      false,
 	})
 	defer ns.Shutdown()
-
-	sa := ns.Server.SystemAccount()
-	s.NotNil(sa)
-	s.Equal("SYS", sa.Name)
 }
 
 func (s *BasicTestSuite) TestServerConfigJetStream() {
@@ -219,10 +211,8 @@ func (s *BasicTestSuite) TestServerConfigJetStream() {
 	defer td.Cleanup()
 
 	opts := DefaultNatsServerWithJetStreamOptions(td.Dir)
-	opts.Debug = true
-	opts.Trace = true
 
-	ns := NewNatsServer(s.T(), opts)
+	ns := NewNatsServer(td, opts)
 	defer ns.Shutdown()
 
 	nc := ns.RequireConnect()
@@ -257,11 +247,9 @@ func (s *BasicTestSuite) TestOperator() {
 
 	resolver := ResolverFromAuth(t, o)
 
-	ns := NewNatsServer(t, &natsserver.Options{
-		ConfigFile: td.WriteFile("server.conf", resolver.Marshal(t)),
+	ns := NewNatsServer(td, &Options{
 		Debug:      true,
-		Trace:      true,
-		NoLog:      false,
+		ConfigFile: td.WriteFile("server.conf", resolver.Marshal(t)),
 	})
 
 	u, err := a.Users().Add("a", "")
@@ -308,14 +296,11 @@ func TestPush(t *testing.T) {
 	config.Resolver.Type = FullResolver
 	config.Resolver.Dir = filepath.Join(td.Dir, "jwts")
 	config.Resolver.AllowDelete = true
-	config.Resolver.UpdateInterval = time.Second * 60
-	config.Resolver.Timeout = time.Second * 2
+	config.Resolver.UpdateInterval = "60s"
+	config.Resolver.Timeout = "2s"
 
-	ns := NewNatsServer(t, &natsserver.Options{
+	ns := NewNatsServer(td, &Options{
 		ConfigFile: td.WriteFile("server.conf", config.Marshal(t)),
-		Debug:      true,
-		Trace:      true,
-		NoLog:      false,
 	})
 	defer ns.Shutdown()
 
@@ -373,4 +358,108 @@ func TestPush(t *testing.T) {
 	// this will not delete if the server doesn't have https://github.com/nats-io/nats-server/pull/6427
 	_, err = DeleteAccount(sysNc, token)
 	require.NoError(t, err)
+}
+
+func TestConf(t *testing.T) {
+	td := NewTestDir(t, "", "nst-test")
+	conf := Conf{
+		PortsFileDir: td.Dir,
+		Debug:        true,
+		Trace:        false,
+		Port:         2224,
+		Accounts: Accounts{
+			"A": Account{
+				Users: Users{
+					User{User: "a", Password: "b", Permissions: &Permissions{
+						Pub: AllowDeny{
+							Allow: []string{"foo"},
+							Deny:  []string{"bar"},
+						},
+						Sub: AllowDeny{
+							Allow: []string{"q"},
+							Deny:  []string{"qq"},
+						},
+						AllowResponses: true,
+					}},
+				},
+			},
+		},
+		JetStream: &JetStream{
+			StoreDir: "/tmp/jsstoredir",
+		},
+		LeafNodes: &LeafNodes{
+			Port: 7422,
+			Remotes: []Remote{
+				{
+					Urls: []string{"nats://127.0.0.1:7422"},
+				},
+			},
+		},
+		WriteDeadline: "3s",
+		WebSocket: &WebSocket{
+			Port:  -1,
+			NoTls: true,
+		},
+		MonitoringPort: 1234,
+	}
+
+	fn := td.WriteFile("server.conf", conf.Marshal(t))
+
+	d, err := os.ReadFile(fn)
+	require.NoError(t, err)
+
+	var conf2 Conf
+	require.NoError(t, json.Unmarshal(d, &conf2))
+
+	require.Equal(t, conf.PortsFileDir, conf2.PortsFileDir)
+	require.Equal(t, conf.Debug, conf2.Debug)
+	require.Equal(t, conf.Trace, conf2.Trace)
+	require.Equal(t, conf.Port, conf2.Port)
+
+	require.Equal(t, len(conf.Accounts), len(conf2.Accounts))
+	A := conf.Accounts["A"]
+	AA := conf2.Accounts["A"]
+	require.NotNil(t, AA)
+	U := A.Users
+	UU := AA.Users
+	require.NotNil(t, UU)
+	require.Equal(t, len(U), len(UU))
+
+	u := UU[0]
+	require.Equal(t, u.User, "a")
+	require.Equal(t, u.Password, "b")
+	// these testing that the serialization wrote Allow/Deny - expression of one
+	// makes the other one...
+	require.Contains(t, u.Permissions.Pub.Allow, "foo")
+	require.Contains(t, u.Permissions.Pub.Deny, "bar")
+	require.Contains(t, u.Permissions.Sub.Allow, "q")
+	require.Contains(t, u.Permissions.Sub.Deny, "qq")
+	require.Equal(t, u.Permissions.AllowResponses, true)
+
+	require.NotNil(t, conf2.JetStream)
+	require.Equal(t, conf2.JetStream.StoreDir, "/tmp/jsstoredir")
+
+	require.NotNil(t, conf2.LeafNodes)
+	require.Equal(t, conf2.LeafNodes.Port, 7422)
+	require.Equal(t, len(conf2.LeafNodes.Remotes), 1)
+	require.Equal(t, conf2.LeafNodes.Remotes[0].Urls[0], "nats://127.0.0.1:7422")
+
+	require.Equal(t, conf2.WriteDeadline, "3s")
+
+	require.Equal(t, conf2.WebSocket.Port, -1)
+	require.Equal(t, conf2.WebSocket.NoTls, true)
+
+	require.Equal(t, conf2.MonitoringPort, 1234)
+
+	ns := StartInProcessServer(t, &Options{
+		ConfigFile: fn,
+		InProcess:  true,
+	})
+	nc := ns.RequireConnect(nats.UserInfo("a", "b"))
+	require.NoError(t, nc.Flush())
+	ns.Shutdown()
+
+	ns = StartExternalProcessWithConfig(t, fn)
+	ns.RequireConnect(nats.UserInfo("a", "b"))
+	ns.Shutdown()
 }
