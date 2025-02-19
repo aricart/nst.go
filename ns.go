@@ -23,6 +23,10 @@ type NatsServer interface {
 	UntrackedConnection(opts ...nats.Option) (*nats.Conn, error)
 	// Shutdown stop the server closing all connections initiated via the API if tracked.
 	Shutdown()
+	// NatsURLs returns a list of all the connection URLs (tcp)
+	NatsURLs() []string
+	// WsURLs returns a list of all the connection URLs (tcp)
+	WsURLs() []string
 }
 
 type Options struct {

@@ -21,6 +21,14 @@ type Connections struct {
 	Conns []*nats.Conn
 }
 
+func (ts *Connections) NatsURLs() []string {
+	return ts.ConnectionPorts.Nats
+}
+
+func (ts *Connections) WsURLs() []string {
+	return ts.ConnectionPorts.WebSocket
+}
+
 func (ts *Connections) Shutdown() {
 	ts.Lock()
 	defer ts.Unlock()
