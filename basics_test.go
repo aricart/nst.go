@@ -307,6 +307,7 @@ func TestPush(t *testing.T) {
 	sysU, err := sys.Users().Add("sys", "")
 	require.NoError(t, err)
 	d, err := sysU.Creds(time.Hour)
+	require.NoError(t, err)
 	sysNc := ns.RequireConnect(nats.UserCredentials(td.WriteFile("sys.creds", d)))
 
 	u, err := a.Users().Add("a", "")
