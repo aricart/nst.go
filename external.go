@@ -28,19 +28,17 @@ type Ports struct {
 }
 
 func StartExternalProcessWithConfig(t testing.TB, fp string) *ExternalNatsServer {
-	portsFileDir := t.TempDir()
-	var conf *ResolverConf
-
-	var process *exec.Cmd
 	if fp == "" {
-		file, err := os.CreateTemp(os.TempDir(), "nats-server-*.conf")
+		dir, err := os.MkdirTemp(os.TempDir(), "nats-server-*.conf")
 		require.NoError(t, err)
-		_, err = file.Write(Conf{PortsFileDir: portsFileDir}.Marshal(t))
+		fp = filepath.Join(dir, "server.conf")
+		require.NoError(t, os.WriteFile(fp, Conf{}.Marshal(t), 0o644))
 		require.NoError(t, err)
-		require.NoError(t, file.Close())
-		fp = file.Name()
 	}
+	portsFileDir := filepath.Dir(fp)
 
+	var conf *ResolverConf
+	var process *exec.Cmd
 	conf = ParseConf(t, fp)
 	wantsLog := conf.Debug || conf.Trace
 
@@ -110,6 +108,7 @@ func StartExternalProcessWithConfig(t testing.TB, fp string) *ExternalNatsServer
 
 	if ports == nil {
 		t.Fatal("nats-server not started")
+		return nil
 	}
 
 	return &ExternalNatsServer{t: t, Process: process, Connections: Connections{
