@@ -456,3 +456,91 @@ func TestConf(t *testing.T) {
 	ns.RequireConnect(nats.UserInfo("a", "b"))
 	ns.Shutdown()
 }
+
+func TestUnboundCallout(t *testing.T) {
+	td := NewTestDir(t, "", "nst-test")
+	defer td.Cleanup()
+
+	auth, err := authb.NewAuth(nsc.NewNscProvider(fmt.Sprintf("%s/nsc/stores", td.Dir), fmt.Sprintf("%s/nsc/keys", td.Dir)))
+	require.NoError(t, err)
+
+	o, err := auth.Operators().Add("O")
+	require.NoError(t, err)
+
+	SYS, err := o.Accounts().Add("SYS")
+	require.NoError(t, err)
+	require.NoError(t, o.SetSystemAccount(SYS))
+
+	A, err := o.Accounts().Add("A")
+	require.NoError(t, err)
+	a, err := A.Users().Add("default_user", "")
+	require.NoError(t, err)
+	require.NoError(t, a.SetBearerToken(true))
+	require.NoError(t, a.PubPermissions().SetAllow("$SYS.REQ.USER.INFO"))
+	require.NoError(t, a.SubPermissions().SetAllow("_INBOX.>"))
+
+	require.NoError(t, auth.Commit())
+
+	config := ResolverFromAuth(t, o)
+	config.Resolver.Type = MemResolver
+
+	config.DefaultSentinel = a.JWT()
+	ns := NewNatsServer(td, &Options{
+		ConfigFile: td.WriteFile("server.conf", config.Marshal(t)),
+	})
+	defer ns.Shutdown()
+
+	nc := ns.RequireConnect()
+	defer nc.Close()
+
+	i := ClientInfo(t, nc)
+	require.Equal(t, i.Data.User, a.Subject())
+}
+
+func TestUnboundCalloutBadJwt(t *testing.T) {
+	td := NewTestDir(t, "", "nst-test")
+	defer td.Cleanup()
+
+	auth, err := authb.NewAuth(nsc.NewNscProvider(fmt.Sprintf("%s/nsc/stores", td.Dir), fmt.Sprintf("%s/nsc/keys", td.Dir)))
+	require.NoError(t, err)
+
+	o, err := auth.Operators().Add("O")
+	require.NoError(t, err)
+
+	SYS, err := o.Accounts().Add("SYS")
+	require.NoError(t, err)
+	require.NoError(t, o.SetSystemAccount(SYS))
+
+	A, err := o.Accounts().Add("A")
+	require.NoError(t, err)
+	a, err := A.Users().Add("default_user", "")
+	require.NoError(t, err)
+	require.NoError(t, a.SetBearerToken(true))
+	require.NoError(t, a.PubPermissions().SetAllow("$SYS.REQ.USER.INFO"))
+	require.NoError(t, a.SubPermissions().SetAllow("_INBOX.>"))
+
+	require.NoError(t, auth.Commit())
+
+	config := ResolverFromAuth(t, o)
+	config.Debug = true
+	config.Trace = true
+	config.Resolver.Type = MemResolver
+
+	config.DefaultSentinel = "bad"
+	ns := NewNatsServer(td, &Options{
+		ConfigFile: td.WriteFile("server.conf", config.Marshal(t)),
+	})
+	defer ns.Shutdown()
+
+	_, err = ns.MaybeConnect()
+	require.Error(t, err)
+
+	sys, err := SYS.Users().Add("sys", "")
+	require.NoError(t, err)
+	sysCreds, err := sys.Creds(time.Hour)
+	fp := td.WriteFile("sys.creds", sysCreds)
+	sysNC := ns.RequireConnect(nats.UserCredentials(fp))
+	defer sysNC.Close()
+
+	require.NoError(t, ServerReload(t, sysNC))
+}
