@@ -70,6 +70,17 @@ func ClientInfo(t testing.TB, nc *nats.Conn) UserInfo {
 	return info
 }
 
+func ServerReload(t testing.TB, sys *nats.Conn) error {
+	type ServerInfo struct {
+		Server ServerDetails `json:"server"`
+	}
+	var si ServerInfo
+	r, err := sys.Request("$SYS.REQ.ACCOUNT.PING.STATZ", nil, time.Second*5)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(r.Data, &si))
+	return err
+}
+
 func DeleteRequestToken(operator authb.Operator, key string, account ...string) (string, error) {
 	r := jwt.NewGenericClaims(key)
 	r.Data = make(map[string]interface{})

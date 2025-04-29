@@ -39,19 +39,20 @@ func DefaultConfig(t testing.TB) *Conf {
 
 // Conf rudimentary struct representing a configuration, missing most :)
 type Conf struct {
-	PortsFileDir   string        `json:"ports_file_dir,omitempty"`
-	Debug          bool          `json:"debug,omitempty"`
-	Trace          bool          `json:"trace,omitempty"`
-	Port           int           `json:"port,omitempty"`
-	Include        string        `json:"include,omitempty"`
-	Accounts       Accounts      `json:"accounts,omitempty"`
-	SystemAccount  *string       `json:"system_account,omitempty"`
-	Authorization  Authorization `json:"authorization,omitempty"`
-	JetStream      *JetStream    `json:"jetstream,omitempty"`
-	LeafNodes      *LeafNodes    `json:"leafnodes,omitempty"`
-	WriteDeadline  string        `json:"write_deadline,omitempty"`
-	WebSocket      *WebSocket    `json:"websocket,omitempty"`
-	MonitoringPort int           `json:"http,omitempty"`
+	PortsFileDir    string        `json:"ports_file_dir,omitempty"`
+	Debug           bool          `json:"debug,omitempty"`
+	Trace           bool          `json:"trace,omitempty"`
+	Port            int           `json:"port,omitempty"`
+	Include         string        `json:"include,omitempty"`
+	Accounts        Accounts      `json:"accounts,omitempty"`
+	SystemAccount   *string       `json:"system_account,omitempty"`
+	Authorization   Authorization `json:"authorization,omitempty"`
+	DefaultSentinel string        `json:"default_sentinel,omitempty"`
+	JetStream       *JetStream    `json:"jetstream,omitempty"`
+	LeafNodes       *LeafNodes    `json:"leafnodes,omitempty"`
+	WriteDeadline   string        `json:"write_deadline,omitempty"`
+	WebSocket       *WebSocket    `json:"websocket,omitempty"`
+	MonitoringPort  int           `json:"http,omitempty"`
 }
 
 type WebSocket struct {
@@ -71,8 +72,9 @@ type JetStream struct {
 }
 
 type LeafNodes struct {
-	Port    int      `json:"port,omitempty"`
-	Remotes []Remote `json:"remotes,omitempty"`
+	Compression string   `json:"compression,omitempty"`
+	Port        int      `json:"port,omitempty"`
+	Remotes     []Remote `json:"remotes,omitempty"`
 }
 
 type Remote struct {
@@ -118,8 +120,7 @@ type AuthCallout struct {
 	// XKey optional public curve key, activates encryption
 	XKey string `json:"xkey,omitempty"`
 	// AllowedAccounts optional public list of accounts that users can be placed in
-	// this option is not yet available
-	// AllowedAccounts jwt.StringList `json:"allowed_accounts,omitempty"`
+	AllowedAccounts jwt.StringList `json:"allowed_accounts,omitempty"`
 }
 
 // Users block
