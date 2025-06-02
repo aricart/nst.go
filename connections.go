@@ -10,8 +10,10 @@ import (
 )
 
 type ConnectionPorts struct {
-	Nats      []string
-	WebSocket []string
+	Nats       []string
+	WebSocket  []string
+	Cluster    []string
+	Monitoring []string
 }
 
 type Connections struct {
@@ -27,6 +29,10 @@ func (ts *Connections) NatsURLs() []string {
 
 func (ts *Connections) WsURLs() []string {
 	return ts.ConnectionPorts.WebSocket
+}
+
+func (ts *Connections) ClusterURLs() []string {
+	return ts.ConnectionPorts.Cluster
 }
 
 func (ts *Connections) Shutdown() {

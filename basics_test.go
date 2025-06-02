@@ -544,3 +544,42 @@ func TestUnboundCalloutBadJwt(t *testing.T) {
 
 	require.NoError(t, ServerReload(t, sysNC))
 }
+
+func TestClustering(t *testing.T) {
+	td := NewTestDir(t, "", "nst-test")
+	defer td.Cleanup()
+
+	var conf Conf
+	conf.Port = -1
+	conf.Cluster = &Cluster{
+		Port: -1,
+	}
+
+	srv := NewNatsServer(td, &Options{
+		ConfigFile: td.WriteFile("server.conf", conf.Marshal(t)),
+	})
+
+	defer srv.Shutdown()
+
+	nc := srv.RequireConnect()
+	nc.Subscribe("hello", func(msg *nats.Msg) {
+		msg.Respond(nil)
+	})
+
+	var conf2 Conf
+	conf2.Port = -1
+	conf2.Cluster = &Cluster{
+		Port:   -1,
+		Routes: srv.ClusterURLs(),
+	}
+
+	srv2 := NewNatsServer(td, &Options{
+		ConfigFile: td.WriteFile("server2.conf", conf2.Marshal(t)),
+	})
+	defer srv2.Shutdown()
+
+	nc2 := srv2.RequireConnect()
+
+	_, err := nc2.Request("hello", nil, time.Second*2)
+	require.NoError(t, err)
+}

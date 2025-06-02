@@ -27,6 +27,8 @@ type NatsServer interface {
 	NatsURLs() []string
 	// WsURLs returns a list of all the connection URLs (tcp)
 	WsURLs() []string
+	// ClusterURLs returns a list of all the cluster connection URLs (tcp)
+	ClusterURLs() []string
 }
 
 type Options struct {

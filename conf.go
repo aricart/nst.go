@@ -53,6 +53,7 @@ type Conf struct {
 	WriteDeadline   string        `json:"write_deadline,omitempty"`
 	WebSocket       *WebSocket    `json:"websocket,omitempty"`
 	MonitoringPort  int           `json:"http,omitempty"`
+	Cluster         *Cluster      `json:"cluster,omitempty"`
 }
 
 type WebSocket struct {
@@ -62,6 +63,21 @@ type WebSocket struct {
 	UserCookie  string `json:"user_cookie,omitempty"`
 	PassCookie  string `json:"pass_cookie,omitempty"`
 	TokenCookie string `json:"token_cookie,omitempty"`
+}
+
+type Cluster struct {
+	Name           string                `json:"name,omitempty"`
+	Port           int                   `json:"port,omitempty"`
+	NoAdvertise    bool                  `json:"no_advertise,omitempty"`
+	ConnectRetries int                   `json:"connect_retries,omitempty"`
+	Authorization  *ClusterAuthorization `json:"authorization,omitempty"`
+	Routes         []string              `json:"routes,omitempty"`
+}
+
+type ClusterAuthorization struct {
+	User     string `json:"user,omitempty"`
+	Password string `json:"password,omitempty"`
+	Timeout  string `json:"timeout,omitempty"`
 }
 
 type JetStream struct {
@@ -79,6 +95,7 @@ type LeafNodes struct {
 
 type Remote struct {
 	Urls        []string `json:"urls,omitempty"`
+	Account     string   `json:"account,omitempty"`
 	Credentials string   `json:"credentials,omitempty"`
 }
 
