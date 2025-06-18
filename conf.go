@@ -54,6 +54,7 @@ type Conf struct {
 	WebSocket       *WebSocket    `json:"websocket,omitempty"`
 	MonitoringPort  int           `json:"http,omitempty"`
 	Cluster         *Cluster      `json:"cluster,omitempty"`
+	MaxPending      int           `json:"max_pending,omitempty"`
 }
 
 type WebSocket struct {
