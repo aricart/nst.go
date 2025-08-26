@@ -497,7 +497,7 @@ func TestUnboundCallout(t *testing.T) {
 	require.Equal(t, i.Data.User, a.Subject())
 }
 
-func TestUnboundCalloutBadJwt(t *testing.T) {
+func TestDefaultSentinel(t *testing.T) {
 	td := NewTestDir(t, "", "nst-test")
 	defer td.Cleanup()
 
@@ -526,23 +526,18 @@ func TestUnboundCalloutBadJwt(t *testing.T) {
 	config.Trace = true
 	config.Resolver.Type = MemResolver
 
-	config.DefaultSentinel = "bad"
+	config.DefaultSentinel = a.JWT()
 	ns := NewNatsServer(td, &Options{
 		ConfigFile: td.WriteFile("server.conf", config.Marshal(t)),
 	})
 	defer ns.Shutdown()
 
-	_, err = ns.MaybeConnect()
-	require.Error(t, err)
-
-	sys, err := SYS.Users().Add("sys", "")
+	nc, err := ns.MaybeConnect()
 	require.NoError(t, err)
-	sysCreds, err := sys.Creds(time.Hour)
-	fp := td.WriteFile("sys.creds", sysCreds)
-	sysNC := ns.RequireConnect(nats.UserCredentials(fp))
-	defer sysNC.Close()
+	require.NoError(t, nc.Flush())
 
-	require.NoError(t, ServerReload(t, sysNC))
+	i := ClientInfo(t, nc)
+	require.Equal(t, i.Data.User, a.Subject())
 }
 
 func TestClustering(t *testing.T) {
