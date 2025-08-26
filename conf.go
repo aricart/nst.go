@@ -120,6 +120,32 @@ func ParseConf(t testing.TB, fp string) *ResolverConf {
 	var c ResolverConf
 	require.NoError(t, json.Unmarshal(d, &c))
 	return &c
+
+}
+
+// UnmarshalJSON custom unmarshaler for ResolverConf
+func (r *ResolverConf) UnmarshalJSON(data []byte) error {
+	// First unmarshal into the embedded Conf
+	if err := json.Unmarshal(data, &r.Conf); err != nil {
+		return err
+	}
+
+	// Then unmarshal resolver-specific fields using an alias to avoid recursion
+	type Alias struct {
+		Operator      string            `json:"operator,omitempty"`
+		SystemAccount string            `json:"system_account,omitempty"`
+		Resolver      *Resolver         `json:"resolver,omitempty"`
+		Preload       map[string]string `json:"resolver_preload,omitempty"`
+	}
+	var aux Alias
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	r.Operator = aux.Operator
+	r.SystemAccount = aux.SystemAccount
+	r.Resolver = aux.Resolver
+	r.Preload = aux.Preload
+	return nil
 }
 
 // Authorization block
