@@ -3,6 +3,7 @@ package nst
 import (
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -35,8 +36,16 @@ func (td *TestDir) Cleanup() {
 	}
 }
 
+func (td *TestDir) CopyFile(paths ...string) {
+	for _, p := range paths {
+		d, err := os.ReadFile(p)
+		require.NoError(td.t, err)
+		td.WriteFile(filepath.Base(p), d)
+	}
+}
+
 func (td *TestDir) WriteFile(name string, conf []byte) string {
-	fp := path.Join(td.Dir, name)
+	fp := filepath.Join(td.Dir, name)
 	require.NoError(td.t, os.WriteFile(fp, conf, 0o644))
 	return fp
 }

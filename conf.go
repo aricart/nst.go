@@ -120,7 +120,6 @@ func ParseConf(t testing.TB, fp string) *ResolverConf {
 	var c ResolverConf
 	require.NoError(t, json.Unmarshal(d, &c))
 	return &c
-
 }
 
 // UnmarshalJSON custom unmarshaler for ResolverConf

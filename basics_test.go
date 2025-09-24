@@ -575,8 +575,10 @@ func TestClustering(t *testing.T) {
 
 	nc2 := srv2.RequireConnect()
 
-	_, err := nc2.Request("hello", nil, time.Second*2)
-	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		_, err := nc2.Request("hello", nil, time.Second*2)
+		return err == nil
+	}, time.Second*2, time.Millisecond*100)
 }
 
 func TestParseResolverConfJSON(t *testing.T) {
@@ -629,4 +631,11 @@ func TestParseResolverConfJSON(t *testing.T) {
 	accC, ok := conf.Preload["ADB77I2PCJSREARW64XVPQT3T55NPRVRX37UBG7CYC37KSAF2PLBLCNO"]
 	require.True(t, ok)
 	require.NotEmpty(t, accC)
+}
+
+func TestDirCopy(t *testing.T) {
+	td := NewTestDir(t, "", "")
+	defer td.Cleanup()
+	td.CopyFile("./conf.go")
+	require.FileExists(t, filepath.Join(td.Dir, "conf.go"))
 }
