@@ -630,3 +630,10 @@ func TestParseResolverConfJSON(t *testing.T) {
 	require.True(t, ok)
 	require.NotEmpty(t, accC)
 }
+
+func TestDirCopy(t *testing.T) {
+	td := NewTestDir(t, "", "")
+	defer td.Cleanup()
+	td.CopyFile("./conf.go")
+	require.FileExists(t, filepath.Join(td.Dir, "conf.go"))
+}
