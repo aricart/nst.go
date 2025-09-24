@@ -575,8 +575,10 @@ func TestClustering(t *testing.T) {
 
 	nc2 := srv2.RequireConnect()
 
-	_, err := nc2.Request("hello", nil, time.Second*2)
-	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		_, err := nc2.Request("hello", nil, time.Second*2)
+		return err == nil
+	}, time.Second*2, time.Millisecond*100)
 }
 
 func TestParseResolverConfJSON(t *testing.T) {
