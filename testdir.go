@@ -55,3 +55,7 @@ func (td *TestDir) ReadFile(name string) []byte {
 	require.NoError(td.t, err)
 	return data
 }
+
+func (td *TestDir) Abs(name string) string {
+	return path.Join(td.Dir, name)
+}
