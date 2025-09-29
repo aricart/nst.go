@@ -46,6 +46,7 @@ func (td *TestDir) CopyFile(paths ...string) {
 
 func (td *TestDir) WriteFile(name string, conf []byte) string {
 	fp := filepath.Join(td.Dir, name)
+	require.NoError(td.t, os.MkdirAll(filepath.Dir(fp), 0o755))
 	require.NoError(td.t, os.WriteFile(fp, conf, 0o644))
 	return fp
 }

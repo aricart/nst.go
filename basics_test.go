@@ -638,4 +638,9 @@ func TestDirCopy(t *testing.T) {
 	defer td.Cleanup()
 	td.CopyFile("./conf.go")
 	require.FileExists(t, filepath.Join(td.Dir, "conf.go"))
+
+	td.WriteFile("confs/conf.go", td.ReadFile("conf.go"))
+	fp := td.Abs("confs/conf.go")
+	require.FileExists(t, fp)
+	require.Equal(t, fp, filepath.Join(td.Dir, "confs/conf.go"))
 }
