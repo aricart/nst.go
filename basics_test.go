@@ -137,9 +137,10 @@ func (s *BasicTestSuite) TestServerLeafNodeConfig() {
 	defer ns.Shutdown()
 
 	nc := ns.RequireConnect()
-	nc.Subscribe("q", func(m *nats.Msg) {
+	_, err := nc.Subscribe("q", func(m *nats.Msg) {
 		_ = m.Respond(m.Data)
 	})
+	s.NoError(err)
 
 	ln := Conf{}
 	ln.LeafNodes = &LeafNodes{}
@@ -557,9 +558,10 @@ func TestClustering(t *testing.T) {
 	defer srv.Shutdown()
 
 	nc := srv.RequireConnect()
-	nc.Subscribe("hello", func(msg *nats.Msg) {
-		msg.Respond(nil)
+	_, err := nc.Subscribe("hello", func(msg *nats.Msg) {
+		_ = msg.Respond(nil)
 	})
+	require.NoError(t, err)
 
 	var conf2 Conf
 	conf2.Port = -1
@@ -643,4 +645,92 @@ func TestDirCopy(t *testing.T) {
 	fp := td.Abs("confs/conf.go")
 	require.FileExists(t, fp)
 	require.Equal(t, fp, filepath.Join(td.Dir, "confs/conf.go"))
+}
+
+func TestPushDeleteAccount(t *testing.T) {
+	td := NewTestDir(t, "", "nst-test")
+	defer td.Cleanup()
+
+	auth, err := authb.NewAuth(nsc.NewNscProvider(fmt.Sprintf("%s/nsc/stores", td.Dir), fmt.Sprintf("%s/nsc/keys", td.Dir)))
+	require.NoError(t, err)
+
+	o, err := auth.Operators().Add("O")
+	require.NoError(t, err)
+
+	sys, err := o.Accounts().Add("SYS")
+	require.NoError(t, err)
+	export, err := sys.Exports().Services().Add("resolver", "$SYS.REQ.CLAIMS.*")
+	require.NoError(t, err)
+	require.NoError(t, export.SetTokenRequired(true))
+	require.NoError(t, o.SetSystemAccount(sys))
+
+	require.NoError(t, auth.Commit())
+
+	config := ResolverFromAuth(t, o)
+	config.Resolver.Type = FullResolver
+	config.Resolver.Dir = filepath.Join(td.Dir, "jwts")
+	config.Resolver.AllowDelete = true
+	config.Resolver.UpdateInterval = "60s"
+	config.Resolver.Timeout = "2s"
+
+	ns := NewNatsServer(td, &Options{
+		ConfigFile: td.WriteFile("server.conf", config.Marshal(t)),
+	})
+	defer ns.Shutdown()
+
+	sysU, err := sys.Users().Add("sys", "")
+	require.NoError(t, err)
+	d, err := sysU.Creds(time.Hour)
+	require.NoError(t, err)
+	sysNc := ns.RequireConnect(nats.UserCredentials(td.WriteFile("sys.creds", d)))
+
+	a, err := o.Accounts().Add("A")
+	require.NoError(t, err)
+	si, err := export.GenerateImport()
+	require.NoError(t, err)
+	token, err := export.GenerateActivation(a.Subject(), sys.Subject())
+	require.NoError(t, err)
+	require.NoError(t, si.SetToken(token))
+	require.NoError(t, a.Imports().Services().AddWithConfig(si))
+
+	// list
+	list, err := ListAccounts(sysNc)
+	require.NoError(t, err)
+	require.Len(t, list.Accounts, 1)
+	t.Logf("first list %+v", list.Accounts)
+
+	c, err := o.Accounts().Add("C")
+	require.NoError(t, err)
+
+	ur, err := UpdateAccount(sysNc, c.JWT())
+	require.NoError(t, err)
+	require.Equal(t, 200, ur.UpdateData.Code)
+
+	list, err = ListAccounts(sysNc)
+	require.NoError(t, err)
+	require.Len(t, list.Accounts, 2)
+	t.Logf("added %+v", list.Accounts)
+
+	lr, err := ListAccounts(sysNc)
+	require.NoError(t, err)
+
+	require.Contains(t, lr.Accounts, sys.Subject())
+	require.Contains(t, lr.Accounts, c.Subject())
+
+	token, err = GetAccount(sysNc, c.Subject())
+	require.NoError(t, err)
+	cc, err := jwt.DecodeAccountClaims(token)
+	require.NoError(t, err)
+	require.Equal(t, cc.Subject, c.Subject())
+
+	token, err = DeleteRequestToken(o, o.Subject(), c.Subject())
+	require.NoError(t, err)
+	// this will not delete if the server doesn't have https://github.com/nats-io/nats-server/pull/6427
+	_, err = DeleteAccount(sysNc, token)
+	require.NoError(t, err)
+
+	list, err = ListAccounts(sysNc)
+	require.NoError(t, err)
+	require.Len(t, list.Accounts, 1)
+	t.Logf("third list %+v", list.Accounts)
 }

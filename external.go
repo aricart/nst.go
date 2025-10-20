@@ -112,6 +112,7 @@ func StartExternalProcessWithConfig(t testing.TB, fp string) *ExternalNatsServer
 	}
 
 	return &ExternalNatsServer{t: t, Process: process, Connections: Connections{
+		t: t,
 		ConnectionPorts: ConnectionPorts{
 			Nats:       ports.Nats,
 			WebSocket:  ports.WebSocket,
