@@ -60,3 +60,7 @@ func (td *TestDir) ReadFile(name string) []byte {
 func (td *TestDir) Abs(name string) string {
 	return path.Join(td.Dir, name)
 }
+
+func (td *TestDir) T() testing.TB {
+	return td.t
+}
