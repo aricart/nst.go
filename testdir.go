@@ -11,8 +11,9 @@ import (
 
 // TestDir a directory  with some simple powers
 type TestDir struct {
-	t   testing.TB
-	Dir string
+	t       testing.TB
+	Dir     string
+	cleaned bool
 }
 
 func NewTestDir(t testing.TB, dir string, pattern string) *TestDir {
@@ -29,6 +30,10 @@ func (td *TestDir) String() string {
 }
 
 func (td *TestDir) Cleanup() {
+	if td.cleaned {
+		return
+	}
+	td.cleaned = true
 	if td.t.Failed() {
 		td.t.Logf("test Dir location: %v", td)
 	} else {
