@@ -1,6 +1,7 @@
 name: test-windows
 on:
-  workflow_dispatch:
+  push:
+  pull_request:
 permissions:
   contents: read
 jobs:
