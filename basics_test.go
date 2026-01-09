@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -95,7 +96,9 @@ func (s *BasicTestSuite) TestServerConfig() {
 	ws, err := ns.WsMaybeConnect(nats.UserInfo("a", "b"))
 	s.NoError(err)
 	s.NotNil(ws)
-	s.Contains(ws.Servers()[0], "ws://127.0.0.1:")
+	// on windows the server may bind to ipv6 instead of 127.0.0.1
+	wsUrl := ws.Servers()[0]
+	s.True(strings.Contains(wsUrl, "ws://127.0.0.1:") || strings.Contains(wsUrl, "ws://["))
 
 	info := ClientInfo(s.T(), nc)
 	s.Len(info.Data.Permissions.Pub.Allow, 2)
