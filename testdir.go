@@ -3,6 +3,7 @@ package nst
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,9 +11,9 @@ import (
 
 // TestDir a directory  with some simple powers
 type TestDir struct {
-	t       testing.TB
-	Dir     string
-	cleaned bool
+	t           testing.TB
+	Dir         string
+	cleanupOnce sync.Once
 }
 
 func NewTestDir(t testing.TB, dir string, pattern string) *TestDir {
@@ -29,15 +30,13 @@ func (td *TestDir) String() string {
 }
 
 func (td *TestDir) Cleanup() {
-	if td.cleaned {
-		return
-	}
-	td.cleaned = true
-	if td.t.Failed() {
-		td.t.Logf("test Dir location: %v", td)
-	} else {
-		_ = os.RemoveAll(td.Dir)
-	}
+	td.cleanupOnce.Do(func() {
+		if td.t.Failed() {
+			td.t.Logf("test Dir location: %v", td)
+		} else {
+			_ = os.RemoveAll(td.Dir)
+		}
+	})
 }
 
 func (td *TestDir) CopyFile(paths ...string) {
