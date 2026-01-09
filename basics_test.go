@@ -295,7 +295,7 @@ func TestPush(t *testing.T) {
 
 	config := ResolverFromAuth(t, o)
 	config.Resolver.Type = FullResolver
-	config.Resolver.Dir = filepath.Join(td.Dir, "jwts")
+	config.Resolver.Dir = filepath.ToSlash(filepath.Join(td.Dir, "jwts"))
 	config.Resolver.AllowDelete = true
 	config.Resolver.UpdateInterval = "60s"
 	config.Resolver.Timeout = "2s"
@@ -668,7 +668,7 @@ func TestPushDeleteAccount(t *testing.T) {
 
 	config := ResolverFromAuth(t, o)
 	config.Resolver.Type = FullResolver
-	config.Resolver.Dir = filepath.Join(td.Dir, "jwts")
+	config.Resolver.Dir = filepath.ToSlash(filepath.Join(td.Dir, "jwts"))
 	config.Resolver.AllowDelete = true
 	config.Resolver.UpdateInterval = "60s"
 	config.Resolver.Timeout = "2s"
