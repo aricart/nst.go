@@ -84,7 +84,7 @@ func NewNatsServer(dir *TestDir, opts *Options) NatsServer {
 	}
 	if opts.JetStream {
 		conf.JetStream = &JetStream{
-			StoreDir: opts.StoreDir,
+			StoreDir: filepath.ToSlash(opts.StoreDir),
 		}
 	}
 	opts.ConfigFile = dir.WriteFile("server.conf", conf.Marshal(t))
