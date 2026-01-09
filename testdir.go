@@ -2,7 +2,6 @@ package nst
 
 import (
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -57,13 +56,13 @@ func (td *TestDir) WriteFile(name string, conf []byte) string {
 }
 
 func (td *TestDir) ReadFile(name string) []byte {
-	data, err := os.ReadFile(path.Join(td.Dir, name))
+	data, err := os.ReadFile(filepath.Join(td.Dir, name))
 	require.NoError(td.t, err)
 	return data
 }
 
 func (td *TestDir) Abs(name string) string {
-	return path.Join(td.Dir, name)
+	return filepath.Join(td.Dir, name)
 }
 
 func (td *TestDir) T() testing.TB {
