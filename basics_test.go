@@ -737,3 +737,68 @@ func TestPushDeleteAccount(t *testing.T) {
 	require.Len(t, list.Accounts, 1)
 	t.Logf("third list %+v", list.Accounts)
 }
+
+func TestNKeyUsers(t *testing.T) {
+	td := NewTestDir(t, "", "")
+	defer td.Cleanup()
+
+	conf := Conf{Accounts: make(map[string]Account), JetStream: &JetStream{}}
+	conf.JetStream.StoreDir = td.Dir
+	conf.JetStream.MaxMem = 100 * 1024 * 1024
+	conf.JetStream.MaxFile = 100 * 1024 * 1024
+
+	kpa, err := nkeys.CreateUser()
+	require.NoError(t, err)
+	pka, err := kpa.PublicKey()
+	require.NoError(t, err)
+
+	kpb, err := nkeys.CreateUser()
+	require.NoError(t, err)
+	pkb, err := kpb.PublicKey()
+	require.NoError(t, err)
+
+	A := Account{}
+	A.EnableJetStream()
+	A.Users.Add(User{NKEY: pka})
+	conf.Accounts["A"] = A
+
+	B := Account{}
+	B.Users.Add(User{NKEY: pkb})
+	B.DisableJetStream()
+	conf.Accounts["B"] = B
+
+	fp := td.WriteFile("server.conf", conf.Marshal(t))
+
+	ns := NewNatsServer(td, &Options{ConfigFile: fp})
+	defer ns.Shutdown()
+
+	a := ns.RequireConnect(nats.Nkey(pka, func(nonce []byte) ([]byte, error) {
+		return kpa.Sign(nonce)
+	}))
+
+	require.NoError(t, a.Publish("foo", []byte("bar")))
+	jsa, err := jetstream.New(a)
+	require.NoError(t, err)
+
+	kv, err := jsa.CreateKeyValue(t.Context(), jetstream.KeyValueConfig{Bucket: "kv"})
+	require.NoError(t, err)
+
+	_, err = kv.Put(t.Context(), "A", []byte("hello"))
+	require.NoError(t, err)
+
+	e, err := kv.Get(t.Context(), "A")
+	require.NoError(t, err)
+	require.Equal(t, []byte("hello"), e.Value())
+
+	b := ns.RequireConnect(nats.Nkey(pkb, func(nonce []byte) ([]byte, error) {
+		return kpb.Sign(nonce)
+	}))
+
+	require.NoError(t, b.Publish("foo", []byte("bar")))
+
+	jsb, err := jetstream.New(b)
+	require.NoError(t, err)
+
+	_, err = jsb.AccountInfo(t.Context())
+	require.ErrorContains(t, err, "jetstream not enabled for account")
+}
