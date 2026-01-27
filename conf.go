@@ -178,7 +178,16 @@ func (u *Users) Add(user ...User) {
 type Accounts map[string]Account
 
 type Account struct {
-	Users Users `json:"users,omitempty"`
+	Users     Users  `json:"users,omitempty"`
+	JetStream string `json:"jetstream,omitempty"`
+}
+
+func (a *Account) EnableJetStream() {
+	a.JetStream = "enabled"
+}
+
+func (a *Account) DisableJetStream() {
+	a.JetStream = "disabled"
 }
 
 // User represents Username/Password/Token/Permissions
@@ -186,6 +195,7 @@ type User struct {
 	User        string       `json:"user,omitempty"`
 	Password    string       `json:"password,omitempty"`
 	Token       string       `json:"token,omitempty"`
+	NKEY        string       `json:"nkey,omitempty"`
 	Permissions *Permissions `json:"permissions,omitempty"`
 }
 
