@@ -149,6 +149,7 @@ func (r *ResolverConf) UnmarshalJSON(data []byte) error {
 
 // Authorization block
 type Authorization struct {
+	Token       string       `json:"token,omitempty"`
 	Users       Users        `json:"users,omitempty"`
 	AuthCallout *AuthCallout `json:"auth_callout,omitempty"`
 }
