@@ -802,3 +802,21 @@ func TestNKeyUsers(t *testing.T) {
 	_, err = jsb.AccountInfo(t.Context())
 	require.ErrorContains(t, err, "jetstream not enabled for account")
 }
+
+func TestTokenAuth(t *testing.T) {
+	td := NewTestDir(t, "", "")
+	defer td.Cleanup()
+
+	var conf Conf
+	conf.Authorization.Token = "let-me-in"
+
+	fp := td.WriteFile("server.conf", conf.Marshal(t))
+
+	ns := NewNatsServer(td, &Options{ConfigFile: fp})
+	defer ns.Shutdown()
+
+	ns.RequireConnect(nats.Token("let-me-in"))
+
+	_, err := ns.MaybeConnect(nats.UserInfo("hello", "world"))
+	require.Error(t, err)
+}
