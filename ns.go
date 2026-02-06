@@ -25,7 +25,7 @@ type NatsServer interface {
 	Shutdown()
 	// NatsURLs returns a list of all the connection URLs (tcp)
 	NatsURLs() []string
-	// WsURLs returns a list of all the connection URLs (tcp)
+	// WsURLs returns a list of all the connection URLs (websocket)
 	WsURLs() []string
 	// ClusterURLs returns a list of all the cluster connection URLs (tcp)
 	ClusterURLs() []string
@@ -90,11 +90,3 @@ func NewNatsServer(dir *TestDir, opts *Options) NatsServer {
 	opts.ConfigFile = dir.WriteFile("server.conf", conf.Marshal(t))
 	return StartExternalProcessWithConfig(t, opts.ConfigFile)
 }
-
-//func StartNatsServer(t testing.TB, opts *Options) (NatsServer, string) {
-//	if opts.InProcess {
-//		return StartInProcessServer(t, opts)
-//	} else {
-//		StartExternalProcess(t, opts)
-//	}
-//}

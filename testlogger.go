@@ -2,6 +2,7 @@ package nst
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"testing"
 )
@@ -9,6 +10,11 @@ import (
 // TestHandler implements slog.Handler and outputs to testing.TB
 type TestHandler struct {
 	t testing.TB
+}
+
+// NewDiscardLogger creates a new slog.Logger that discards all output
+func NewDiscardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 // NewTestLogger creates a new slog.Logger that outputs to testing.TB

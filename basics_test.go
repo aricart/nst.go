@@ -190,7 +190,7 @@ func (s *BasicTestSuite) TestServerConfigAccounts() {
 	s.NoError(err)
 	var info UserInfo
 	s.NoError(json.Unmarshal(r.Data, &info))
-	fmt.Printf("%+v\n", info)
+	s.T().Logf("%+v", info)
 }
 
 func (s *BasicTestSuite) TestSys() {
@@ -367,6 +367,7 @@ func TestPush(t *testing.T) {
 
 func TestConf(t *testing.T) {
 	td := NewTestDir(t, "", "nst-test")
+	defer td.Cleanup()
 	conf := Conf{
 		PortsFileDir: td.Dir,
 		Debug:        true,
