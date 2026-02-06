@@ -8,7 +8,7 @@ import (
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/stretchr/testify/require"
-	"github.com/synadia-io/jwt-auth-builder.go"
+	authb "github.com/synadia-io/jwt-auth-builder.go"
 )
 
 func ResolverFromAuth(t testing.TB, operator authb.Operator) *ResolverConf {
@@ -29,12 +29,6 @@ func ResolverFromAuth(t testing.TB, operator authb.Operator) *ResolverConf {
 		config.Preload[a.Subject()] = a.JWT()
 	}
 	return &config
-}
-
-func DefaultConfig(t testing.TB) *Conf {
-	return &Conf{
-		Port: -1,
-	}
 }
 
 // Conf rudimentary struct representing a configuration, missing most :)

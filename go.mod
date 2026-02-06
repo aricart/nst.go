@@ -7,7 +7,7 @@ require (
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats-server/v2 v2.12.4
 	github.com/nats-io/nats.go v1.48.0
-	github.com/nats-io/nkeys v0.4.14
+	github.com/nats-io/nkeys v0.4.15
 	github.com/stretchr/testify v1.11.1
 	github.com/synadia-io/jwt-auth-builder.go v0.0.9
 )
