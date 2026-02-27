@@ -804,6 +804,61 @@ func TestNKeyUsers(t *testing.T) {
 	require.ErrorContains(t, err, "jetstream not enabled for account")
 }
 
+func TestMaxBytesRequired(t *testing.T) {
+	td := NewTestDir(t, "", "")
+	defer td.Cleanup()
+
+	conf := Conf{Accounts: make(map[string]Account), JetStream: &JetStream{}}
+	conf.JetStream.StoreDir = td.Dir
+	conf.JetStream.MaxMem = 100 * 1024 * 1024
+	conf.JetStream.MaxFile = 100 * 1024 * 1024
+
+	kpa, err := nkeys.CreateUser()
+	require.NoError(t, err)
+	pka, err := kpa.PublicKey()
+	require.NoError(t, err)
+
+	A := Account{}
+	A.EnableJetStream(MaxBytesRequired())
+	A.Users.Add(User{NKEY: pka})
+	conf.Accounts["A"] = A
+
+	fp := td.WriteFile("server.conf", conf.Marshal(t))
+
+	ns := NewNatsServer(td, &Options{ConfigFile: fp})
+	defer ns.Shutdown()
+
+	a := ns.RequireConnect(nats.Nkey(pka, func(nonce []byte) ([]byte, error) {
+		return kpa.Sign(nonce)
+	}))
+
+	m, err := a.Request("$JS.API.INFO", nil, time.Second*2)
+	require.NoError(t, err)
+	t.Log(string(m.Data))
+
+	jsa, err := jetstream.New(a)
+	require.NoError(t, err)
+
+	ai, err := jsa.AccountInfo(t.Context())
+	require.NoError(t, err)
+	t.Logf("account info %+v", ai)
+
+	// max_bytes is required, so creating without it should fail
+	_, err = jsa.CreateStream(t.Context(), jetstream.StreamConfig{
+		Name:     "test",
+		Subjects: []string{"test.>"},
+	})
+	require.Error(t, err)
+
+	// with max_bytes set, it should succeed
+	_, err = jsa.CreateStream(t.Context(), jetstream.StreamConfig{
+		Name:     "test",
+		Subjects: []string{"test.>"},
+		MaxBytes: 1024 * 1024,
+	})
+	require.NoError(t, err)
+}
+
 func TestTokenAuth(t *testing.T) {
 	td := NewTestDir(t, "", "")
 	defer td.Cleanup()

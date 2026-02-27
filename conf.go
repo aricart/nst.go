@@ -173,16 +173,95 @@ func (u *Users) Add(user ...User) {
 type Accounts map[string]Account
 
 type Account struct {
-	Users     Users  `json:"users,omitempty"`
-	JetStream string `json:"jetstream,omitempty"`
+	Users     Users             `json:"users,omitempty"`
+	JetStream *AccountJetStream `json:"jetstream,omitempty"`
 }
 
-func (a *Account) EnableJetStream() {
-	a.JetStream = "enabled"
+type AccountJetStreamOpt func(*AccountJetStream)
+
+func MaxMemory(v uint64) AccountJetStreamOpt {
+	return func(a *AccountJetStream) { a.MaxMemory = v }
+}
+
+func MaxStore(v uint64) AccountJetStreamOpt {
+	return func(a *AccountJetStream) { a.MaxStore = v }
+}
+
+func MaxStreams(v int) AccountJetStreamOpt {
+	return func(a *AccountJetStream) { a.MaxStreams = v }
+}
+
+func MaxConsumers(v int) AccountJetStreamOpt {
+	return func(a *AccountJetStream) { a.MaxConsumers = v }
+}
+
+func MaxBytesRequired() AccountJetStreamOpt {
+	return func(a *AccountJetStream) { a.MaxBytesRequired = true }
+}
+
+func MemMaxStreamBytes(v int64) AccountJetStreamOpt {
+	return func(a *AccountJetStream) { a.MemMaxStreamBytes = v }
+}
+
+func DiskMaxStreamBytes(v int64) AccountJetStreamOpt {
+	return func(a *AccountJetStream) { a.DiskMaxStreamBytes = v }
+}
+
+func MaxAckPending(v int) AccountJetStreamOpt {
+	return func(a *AccountJetStream) { a.MaxAckPending = v }
+}
+
+func (a *Account) EnableJetStream(opts ...AccountJetStreamOpt) {
+	a.JetStream = &AccountJetStream{}
+	for _, o := range opts {
+		o(a.JetStream)
+	}
 }
 
 func (a *Account) DisableJetStream() {
-	a.JetStream = "disabled"
+	a.JetStream = &AccountJetStream{disabled: true}
+}
+
+// AccountJetStream represents per-account JetStream configuration.
+// Marshals as "enabled"/"disabled" when no settings are set,
+// or as an object with settings.
+type AccountJetStream struct {
+	disabled           bool
+	MaxMemory          uint64 `json:"max_memory,omitempty"`
+	MaxStore           uint64 `json:"max_store,omitempty"`
+	MaxStreams         int    `json:"max_streams,omitempty"`
+	MaxConsumers       int    `json:"max_consumers,omitempty"`
+	MaxBytesRequired   bool   `json:"max_bytes_required,omitempty"`
+	MemMaxStreamBytes  int64  `json:"mem_max_stream_bytes,omitempty"`
+	DiskMaxStreamBytes int64  `json:"disk_max_stream_bytes,omitempty"`
+	MaxAckPending      int    `json:"max_ack_pending,omitempty"`
+}
+
+func (a *AccountJetStream) hasSettings() bool {
+	return a.MaxMemory != 0 || a.MaxStore != 0 || a.MaxStreams != 0 ||
+		a.MaxConsumers != 0 || a.MaxBytesRequired || a.MaxAckPending != 0 ||
+		a.MemMaxStreamBytes != 0 || a.DiskMaxStreamBytes != 0
+}
+
+func (a AccountJetStream) MarshalJSON() ([]byte, error) {
+	if a.disabled {
+		return json.Marshal("disabled")
+	}
+	if !a.hasSettings() {
+		return json.Marshal("enabled")
+	}
+	type Alias AccountJetStream
+	return json.Marshal(Alias(a))
+}
+
+func (a *AccountJetStream) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		a.disabled = s == "disabled"
+		return nil
+	}
+	type Alias AccountJetStream
+	return json.Unmarshal(data, (*Alias)(a))
 }
 
 // User represents Username/Password/Token/Permissions
