@@ -212,24 +212,24 @@ func MaxAckPending(v int) AccountJetStreamOpt {
 }
 
 func (a *Account) EnableJetStream(opts ...AccountJetStreamOpt) {
-	a.JetStream = &AccountJetStream{}
+	a.JetStream = &AccountJetStream{Enabled: true}
 	for _, o := range opts {
 		o(a.JetStream)
 	}
 }
 
 func (a *Account) DisableJetStream() {
-	a.JetStream = &AccountJetStream{disabled: true}
+	a.JetStream = &AccountJetStream{}
 }
 
 // AccountJetStream represents per-account JetStream configuration.
 // Marshals as "enabled"/"disabled" when no settings are set,
 // or as an object with settings.
 type AccountJetStream struct {
-	disabled           bool
+	Enabled            bool   `json:"-"`
 	MaxMemory          uint64 `json:"max_memory,omitempty"`
 	MaxStore           uint64 `json:"max_store,omitempty"`
-	MaxStreams         int    `json:"max_streams,omitempty"`
+	MaxStreams          int    `json:"max_streams,omitempty"`
 	MaxConsumers       int    `json:"max_consumers,omitempty"`
 	MaxBytesRequired   bool   `json:"max_bytes_required,omitempty"`
 	MemMaxStreamBytes  int64  `json:"mem_max_stream_bytes,omitempty"`
@@ -244,7 +244,7 @@ func (a *AccountJetStream) hasSettings() bool {
 }
 
 func (a AccountJetStream) MarshalJSON() ([]byte, error) {
-	if a.disabled {
+	if !a.Enabled {
 		return json.Marshal("disabled")
 	}
 	if !a.hasSettings() {
@@ -257,11 +257,15 @@ func (a AccountJetStream) MarshalJSON() ([]byte, error) {
 func (a *AccountJetStream) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
-		a.disabled = s == "disabled"
+		a.Enabled = s != "disabled"
 		return nil
 	}
 	type Alias AccountJetStream
-	return json.Unmarshal(data, (*Alias)(a))
+	if err := json.Unmarshal(data, (*Alias)(a)); err != nil {
+		return err
+	}
+	a.Enabled = true
+	return nil
 }
 
 // User represents Username/Password/Token/Permissions
