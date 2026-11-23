@@ -24,15 +24,15 @@ type Connections struct {
 }
 
 func (ts *Connections) NatsURLs() []string {
-	return ts.ConnectionPorts.Nats
+	return ts.Nats
 }
 
 func (ts *Connections) WsURLs() []string {
-	return ts.ConnectionPorts.WebSocket
+	return ts.WebSocket
 }
 
 func (ts *Connections) ClusterURLs() []string {
-	return ts.ConnectionPorts.Cluster
+	return ts.Cluster
 }
 
 func (ts *Connections) Shutdown() {
@@ -61,10 +61,10 @@ func (ts *Connections) RequireConnect(opts ...nats.Option) *nats.Conn {
 func (ts *Connections) MaybeConnect(options ...nats.Option) (*nats.Conn, error) {
 	ts.Lock()
 	defer ts.Unlock()
-	if len(ts.ConnectionPorts.Nats) == 0 {
+	if len(ts.Nats) == 0 {
 		return nil, errors.New("tcp port not enabled")
 	}
-	nc, err := nats.Connect(ts.ConnectionPorts.Nats[0], options...)
+	nc, err := nats.Connect(ts.Nats[0], options...)
 	if err == nil {
 		ts.Conns = append(ts.Conns, nc)
 	}
@@ -72,12 +72,12 @@ func (ts *Connections) MaybeConnect(options ...nats.Option) (*nats.Conn, error) 
 }
 
 func (ts *Connections) WsMaybeConnect(opts ...nats.Option) (*nats.Conn, error) {
-	if len(ts.ConnectionPorts.WebSocket) == 0 {
+	if len(ts.WebSocket) == 0 {
 		return nil, errors.New("websocket port not enabled")
 	}
 	ts.Lock()
 	defer ts.Unlock()
-	nc, err := nats.Connect(ts.ConnectionPorts.WebSocket[0], opts...)
+	nc, err := nats.Connect(ts.WebSocket[0], opts...)
 	if err == nil {
 		ts.Conns = append(ts.Conns, nc)
 	}
@@ -85,8 +85,8 @@ func (ts *Connections) WsMaybeConnect(opts ...nats.Option) (*nats.Conn, error) {
 }
 
 func (ts *Connections) UntrackedConnection(opts ...nats.Option) (*nats.Conn, error) {
-	if len(ts.ConnectionPorts.Nats) == 0 {
+	if len(ts.Nats) == 0 {
 		return nil, errors.New("tcp port not enabled")
 	}
-	return nats.Connect(ts.ConnectionPorts.Nats[0], opts...)
+	return nats.Connect(ts.Nats[0], opts...)
 }
